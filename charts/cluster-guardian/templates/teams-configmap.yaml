@@ -1,0 +1,13 @@
+{{- if .Values.teams -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cluster-guardian.fullname" . }}-teams
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "cluster-guardian.labels" . | nindent 4 }}
+data:
+  teams.yaml: |
+    teams:
+      {{- toYaml .Values.teams | nindent 6 }}
+{{- end }}

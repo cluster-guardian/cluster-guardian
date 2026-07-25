@@ -35,7 +35,13 @@ findings.`,
 		if err != nil {
 			return err
 		}
-		return finishReport(cmd, analyzer.Lint(snapshot, namespaces, flagClusterName))
+		tc, err := loadTeams()
+		if err != nil {
+			return err
+		}
+		r := analyzer.Lint(snapshot, namespaces, flagClusterName)
+		analyzer.AssignTeams(r, snapshot, tc.NamespaceTeam, flagTeamLabel)
+		return finishReport(cmd, r)
 	},
 }
 

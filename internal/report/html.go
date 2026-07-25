@@ -175,6 +175,12 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
       <option value="">All namespaces</option>
       {{range .Namespaces}}<option>{{.Name}}</option>{{end}}
     </select>
+    {{with .Teams}}
+    <select id="teamfilter" aria-label="Filter by team">
+      <option value="">All teams</option>
+      {{range .}}<option>{{.}}</option>{{end}}
+    </select>
+    {{end}}
     {{if .Dashboard}}
     <label class="toggle"><input type="checkbox" id="autorefresh"> auto-refresh</label>
     <a class="btn" href="{{.APIBase}}/report" download="report.json">JSON</a>
@@ -195,8 +201,8 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
   {{end}}
 
   {{range .Namespaces}}{{if .Findings}}
-  <details class="card" open data-ns="{{.Name}}">
-    <summary><h2>📦 Namespace: {{.Name}}</h2>{{template "counts" .Findings}}</summary>
+  <details class="card" open data-ns="{{.Name}}"{{with .Team}} data-team="{{.}}"{{end}}>
+    <summary><h2>📦 Namespace: {{.Name}}{{with .Team}} <span class="badge info">{{.}}</span>{{end}}</h2>{{template "counts" .Findings}}</summary>
     {{template "findings" .Findings}}
   </details>
   {{end}}{{end}}
@@ -214,15 +220,18 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
 (function () {
   var search = document.getElementById('search');
   var nsSel = document.getElementById('nsfilter');
+  var teamSel = document.getElementById('teamfilter');
   var chips = Array.prototype.slice.call(document.querySelectorAll('.chip'));
 
   function apply() {
     var q = search.value.toLowerCase();
     var ns = nsSel.value;
+    var team = teamSel ? teamSel.value : '';
     var active = {};
     chips.forEach(function (c) { if (c.classList.contains('active')) active[c.dataset.sev] = true; });
     document.querySelectorAll('details.card').forEach(function (card) {
       if (ns && card.dataset.ns && card.dataset.ns !== ns) { card.style.display = 'none'; return; }
+      if (team && card.dataset.ns && card.dataset.team !== team) { card.style.display = 'none'; return; }
       var visible = 0;
       card.querySelectorAll('li[data-sev]').forEach(function (li) {
         var show = !!active[li.dataset.sev] && (!q || li.textContent.toLowerCase().indexOf(q) !== -1);
@@ -234,6 +243,7 @@ var htmlTemplate = template.Must(template.New("report").Funcs(template.FuncMap{
   }
   search.addEventListener('input', apply);
   nsSel.addEventListener('change', apply);
+  if (teamSel) teamSel.addEventListener('change', apply);
   chips.forEach(function (c) {
     c.addEventListener('click', function () { c.classList.toggle('active'); apply(); });
   });

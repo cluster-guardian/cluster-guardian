@@ -6,6 +6,7 @@ import (
 
 	"github.com/AndrewKarpaty/cluster-guardian/internal/analyzer"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/kube"
+	"github.com/AndrewKarpaty/cluster-guardian/internal/teams"
 )
 
 var (
@@ -15,6 +16,8 @@ var (
 	flagIncludeSystem bool
 	flagPrometheusURL string
 	flagClusterName   string
+	flagTeamsFile     string
+	flagTeamLabel     string
 )
 
 var rootCmd = &cobra.Command{
@@ -52,21 +55,37 @@ func init() {
 	pf.BoolVar(&flagIncludeSystem, "include-system", false, "also analyze kube-system and other system namespaces")
 	pf.StringVar(&flagPrometheusURL, "prometheus-url", "", "Prometheus base URL for usage-based optimization checks")
 	pf.StringVar(&flagClusterName, "cluster-name", "", "display name for the cluster (defaults to the kube context)")
+	pf.StringVar(&flagTeamsFile, "teams-file", "", "YAML file mapping teams to namespaces (and optional per-team webhooks)")
+	pf.StringVar(&flagTeamLabel, "team-label", "team", "namespace label carrying the owning team (empty disables)")
 }
 
 func newKubeClient() (*kube.Client, error) {
 	return kube.NewClient(flagKubeconfig, flagContext)
 }
 
-func analyzerOptions() analyzer.Options {
+// loadTeams reads --teams-file; no file means an empty mapping.
+func loadTeams() (teams.Config, error) {
+	if flagTeamsFile == "" {
+		return teams.Config{}, nil
+	}
+	return teams.Load(flagTeamsFile)
+}
+
+func analyzerOptions() (analyzer.Options, error) {
+	tc, err := loadTeams()
+	if err != nil {
+		return analyzer.Options{}, err
+	}
 	return analyzer.Options{
 		Namespaces:        flagNamespaces,
 		IncludeSystem:     flagIncludeSystem,
 		PrometheusURL:     flagPrometheusURL,
 		ClusterName:       flagClusterName,
+		TeamOf:            tc.NamespaceTeam,
+		TeamLabel:         flagTeamLabel,
 		RightsizingReport: flagRightsizingReport,
 		RightsizingWindow: flagRightsizingWindow,
 		CostPerCPUMonth:   flagCostPerCPU,
 		CostPerGiBMonth:   flagCostPerGB,
-	}
+	}, nil
 }

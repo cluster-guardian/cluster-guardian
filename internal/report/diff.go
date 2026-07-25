@@ -3,9 +3,11 @@ package report
 import "regexp"
 
 // LocatedFinding is a finding plus where in the report it lives
-// (a section title or "namespace <name>").
+// (a section title or "namespace <name>") and, for namespace findings, the
+// owning team.
 type LocatedFinding struct {
 	Location string `json:"location"`
+	Team     string `json:"team,omitempty"`
 	Finding
 }
 
@@ -30,14 +32,14 @@ func Diff(older, newer *Report) DiffResult {
 	oldKeys := findingKeys(older)
 	newKeys := findingKeys(newer)
 	var d DiffResult
-	forEachFinding(newer, func(loc string, f Finding) {
+	forEachFinding(newer, func(loc, team string, f Finding) {
 		if f.Severity != SeverityOK && !oldKeys[findingKey(loc, f)] {
-			d.New = append(d.New, LocatedFinding{Location: loc, Finding: f})
+			d.New = append(d.New, LocatedFinding{Location: loc, Team: team, Finding: f})
 		}
 	})
-	forEachFinding(older, func(loc string, f Finding) {
+	forEachFinding(older, func(loc, team string, f Finding) {
 		if f.Severity != SeverityOK && !newKeys[findingKey(loc, f)] {
-			d.Resolved = append(d.Resolved, LocatedFinding{Location: loc, Finding: f})
+			d.Resolved = append(d.Resolved, LocatedFinding{Location: loc, Team: team, Finding: f})
 		}
 	})
 	return d
@@ -45,7 +47,7 @@ func Diff(older, newer *Report) DiffResult {
 
 func findingKeys(r *Report) map[string]bool {
 	out := map[string]bool{}
-	forEachFinding(r, func(loc string, f Finding) {
+	forEachFinding(r, func(loc, _ string, f Finding) {
 		if f.Severity != SeverityOK {
 			out[findingKey(loc, f)] = true
 		}
@@ -53,15 +55,15 @@ func findingKeys(r *Report) map[string]bool {
 	return out
 }
 
-func forEachFinding(r *Report, fn func(location string, f Finding)) {
+func forEachFinding(r *Report, fn func(location, team string, f Finding)) {
 	for _, ns := range r.Namespaces {
 		for _, f := range ns.Findings {
-			fn("namespace "+ns.Name, f)
+			fn("namespace "+ns.Name, ns.Team, f)
 		}
 	}
 	for _, s := range r.Sections {
 		for _, f := range s.Findings {
-			fn(s.Title, f)
+			fn(s.Title, "", f)
 		}
 	}
 }

@@ -107,6 +107,44 @@ func TestNotifySkipsWhenNothingQualifies(t *testing.T) {
 	}
 }
 
+func TestRouterRoutesPerTeam(t *testing.T) {
+	globalSrv, globalBodies := capture(t, http.StatusOK)
+	teamSrv, teamBodies := capture(t, http.StatusOK)
+	global, err := New(globalSrv.URL, "slack", "warning")
+	if err != nil {
+		t.Fatal(err)
+	}
+	teamN, err := New(teamSrv.URL, "slack", "warning")
+	if err != nil {
+		t.Fatal(err)
+	}
+	router := NewRouter(global, map[string]*Notifier{"payments-team": teamN})
+
+	findings := []report.LocatedFinding{
+		{Location: "namespace payments", Team: "payments-team",
+			Finding: report.Finding{Severity: report.SeverityCritical, Message: "payments issue"}},
+		{Location: "namespace other", Team: "other-team",
+			Finding: report.Finding{Severity: report.SeverityWarning, Message: "other issue"}},
+		{Location: "Security", // cluster-wide: no team
+			Finding: report.Finding{Severity: report.SeverityWarning, Message: "cluster issue"}},
+	}
+	if err := router.Notify(context.Background(), "prod", findings); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(*globalBodies) != 1 || !strings.Contains((*globalBodies)[0], "cluster issue") {
+		t.Errorf("global sink must receive everything, got %v", *globalBodies)
+	}
+	if len(*teamBodies) != 1 {
+		t.Fatalf("expected exactly 1 team post, got %d", len(*teamBodies))
+	}
+	teamBody := (*teamBodies)[0]
+	if !strings.Contains(teamBody, "payments issue") ||
+		strings.Contains(teamBody, "other issue") || strings.Contains(teamBody, "cluster issue") {
+		t.Errorf("team must only hear about its own namespaces, got %s", teamBody)
+	}
+}
+
 func TestNotifyErrors(t *testing.T) {
 	srv, _ := capture(t, http.StatusForbidden)
 	n, err := New(srv.URL, "slack", "info")

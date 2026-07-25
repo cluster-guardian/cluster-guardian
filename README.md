@@ -252,6 +252,31 @@ the dashboard. Pass `--history-dir /path` to persist history across restarts
 | `GET /metrics`             | Prometheus metrics: findings, score, run stats   |
 | `GET /healthz`             | Liveness probe                                   |
 
+### Team ownership
+
+Map namespaces to teams and every output becomes team-aware. Ownership comes
+from a `team` namespace label (`--team-label` to change the key) and/or a
+teams file:
+
+```yaml
+# teams.yaml
+teams:
+  payments-team: [payments, checkout]
+  platform-team:
+    namespaces: [monitoring]
+    notifyUrl: https://hooks.slack.com/services/...   # this team's webhook
+```
+
+```sh
+cluster-guardian analyze --teams-file teams.yaml --team payments-team   # one team's report
+```
+
+Namespace sections carry a `team` field in JSON, the dashboard gains a team
+filter next to the namespace dropdown, and webhook notifications route per
+team — each team only hears about new findings in its own namespaces, while
+the global `--notify-url` still receives everything. Helm: `teams` and
+`teamLabel` values (the mapping ships as a ConfigMap).
+
 ### Scheduled reports and PDF export
 
 Every report renders to PDF — pure Go, offline, no headless browser:

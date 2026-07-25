@@ -26,6 +26,48 @@ func ciTestReport() *Report {
 	return r
 }
 
+func TestFilterTeamAndDiffTeams(t *testing.T) {
+	r := &Report{
+		Namespaces: []NamespaceSection{
+			{Name: "payments", Team: "payments-team", Findings: []Finding{
+				{Severity: SeverityWarning, Message: "payments finding"},
+			}},
+			{Name: "other", Team: "other-team", Findings: []Finding{
+				{Severity: SeverityCritical, Message: "other finding"},
+			}},
+		},
+		Sections: []Section{{ID: "security", Title: "Security", Findings: []Finding{
+			{Severity: SeverityCritical, Message: "cluster finding"},
+		}}},
+	}
+	r.Finalize()
+
+	// New findings carry the owning team so notifications can route.
+	d := Diff(&Report{}, r)
+	teams := map[string]string{}
+	for _, f := range d.New {
+		teams[f.Message] = f.Team
+	}
+	if teams["payments finding"] != "payments-team" || teams["cluster finding"] != "" {
+		t.Errorf("unexpected team propagation in diff: %v", teams)
+	}
+
+	if got := r.Teams(); len(got) != 2 || got[0] != "other-team" {
+		t.Errorf("unexpected teams list: %v", got)
+	}
+
+	r.FilterTeam("payments-team")
+	if len(r.Namespaces) != 1 || r.Namespaces[0].Name != "payments" {
+		t.Errorf("expected only payments left, got %+v", r.Namespaces)
+	}
+	if len(r.Sections) != 0 {
+		t.Error("cluster-wide sections must be dropped by the team filter")
+	}
+	if r.Summary.Total != 1 || r.Summary.Critical != 0 {
+		t.Errorf("summary must be recomputed, got %+v", r.Summary)
+	}
+}
+
 func TestWriteSARIF(t *testing.T) {
 	var buf bytes.Buffer
 	if err := WriteSARIF(&buf, ciTestReport()); err != nil {

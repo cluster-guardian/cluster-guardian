@@ -5,6 +5,8 @@ package report
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 )
@@ -110,7 +112,9 @@ func scoreFindings(fs []Finding) int {
 
 // NamespaceSection holds per-namespace workload findings.
 type NamespaceSection struct {
-	Name     string    `json:"name"`
+	Name string `json:"name"`
+	// Team owning this namespace, from the teams mapping or namespace label.
+	Team     string    `json:"team,omitempty"`
 	Findings []Finding `json:"findings"`
 }
 
@@ -235,6 +239,32 @@ func (r *Report) FilterControls(prefix string) {
 		r.Namespaces[i].Findings = match(r.Namespaces[i].Findings)
 	}
 	r.Finalize()
+}
+
+// FilterTeam keeps only the namespace sections owned by team and recomputes
+// the summary. Cluster-wide sections are dropped: they are not attributable
+// to a single team.
+func (r *Report) FilterTeam(team string) {
+	var out []NamespaceSection
+	for _, ns := range r.Namespaces {
+		if ns.Team == team {
+			out = append(out, ns)
+		}
+	}
+	r.Namespaces = out
+	r.Sections = nil
+	r.Finalize()
+}
+
+// Teams returns the distinct team names across namespace sections, sorted.
+func (r *Report) Teams() []string {
+	seen := map[string]bool{}
+	for _, ns := range r.Namespaces {
+		if ns.Team != "" {
+			seen[ns.Team] = true
+		}
+	}
+	return slices.Sorted(maps.Keys(seen))
 }
 
 func maxSeverity(fs []Finding) Severity {

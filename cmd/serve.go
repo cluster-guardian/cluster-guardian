@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -55,13 +56,17 @@ var serveCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		srv := server.New(client, analyzerOptions(), flagCacheTTL, hist)
-		var notifier *notify.Notifier
-		if flagNotifyURL != "" {
-			notifier, err = notify.New(flagNotifyURL, flagNotifyFormat, flagNotifyMinSev)
-			if err != nil {
-				return err
-			}
+		opts, err := analyzerOptions()
+		if err != nil {
+			return err
+		}
+		srv := server.New(client, opts, flagCacheTTL, hist)
+
+		notifier, err := buildNotifier()
+		if err != nil {
+			return err
+		}
+		if notifier != nil {
 			srv.EnableNotifications(notifier)
 		}
 		if flagReportSchedule != "" {
@@ -85,7 +90,7 @@ var serveCmd = &cobra.Command{
 				Clientset: client.Clientset,
 				Namespace: fleetNamespace(),
 			}
-			mgr := fleet.NewManager(reg, analyzerOptions(), flagFleetInterval, flagHistoryDir, flagHistoryLimit)
+			mgr := fleet.NewManager(reg, opts, flagFleetInterval, flagHistoryDir, flagHistoryLimit)
 			if notifier != nil {
 				mgr.EnableNotifications(notifier)
 			}
@@ -115,6 +120,37 @@ func init() {
 	serveCmd.Flags().StringVar(&flagReportWebhook, "report-webhook-url", "", "webhook POSTed the report JSON on schedule")
 	serveCmd.Flags().StringVar(&flagReportDir, "report-dir", "", "directory to write scheduled report files into")
 	rootCmd.AddCommand(serveCmd)
+}
+
+// buildNotifier assembles the notification sink: the global --notify-url
+// plus one notifier per team webhook from --teams-file. Returns nil when
+// nothing is configured.
+func buildNotifier() (notify.Sink, error) {
+	tc, err := loadTeams()
+	if err != nil {
+		return nil, err
+	}
+	var global *notify.Notifier
+	if flagNotifyURL != "" {
+		if global, err = notify.New(flagNotifyURL, flagNotifyFormat, flagNotifyMinSev); err != nil {
+			return nil, err
+		}
+	}
+	if len(tc.NotifyURLs) == 0 {
+		if global == nil {
+			return nil, nil
+		}
+		return global, nil
+	}
+	teamSinks := make(map[string]*notify.Notifier, len(tc.NotifyURLs))
+	for team, url := range tc.NotifyURLs {
+		n, err := notify.New(url, flagNotifyFormat, flagNotifyMinSev)
+		if err != nil {
+			return nil, fmt.Errorf("team %q webhook: %w", team, err)
+		}
+		teamSinks[team] = n
+	}
+	return notify.NewRouter(global, teamSinks), nil
 }
 
 // fleetNamespace resolves where cluster secrets live: the flag, the pod's own

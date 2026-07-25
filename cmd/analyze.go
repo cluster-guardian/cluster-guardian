@@ -27,6 +27,7 @@ var (
 	flagRightsizingWindow time.Duration
 	flagCostPerCPU        float64
 	flagCostPerGB         float64
+	flagTeam              string
 )
 
 // failError carries the exit code for --fail-on threshold violations, so CI
@@ -57,7 +58,11 @@ var analyzeCmd = &cobra.Command{
 		ctx, cancel := context.WithTimeout(cmd.Context(), 3*time.Minute)
 		defer cancel()
 
-		r, err := analyzer.Run(ctx, client, analyzerOptions())
+		opts, err := analyzerOptions()
+		if err != nil {
+			return err
+		}
+		r, err := analyzer.Run(ctx, client, opts)
 		if err != nil {
 			return err
 		}
@@ -78,6 +83,9 @@ func validateFramework() error {
 func finishReport(cmd *cobra.Command, r *report.Report) error {
 	if flagFramework != "" {
 		r.FilterControls(flagFramework + "/")
+	}
+	if flagTeam != "" {
+		r.FilterTeam(flagTeam)
 	}
 
 	out := cmd.OutOrStdout()
@@ -157,6 +165,7 @@ func init() {
 		f.StringVar(&flagOutputFile, "output-file", "", "write the report to a file instead of stdout")
 		f.StringVar(&flagFailOn, "fail-on", "none", "exit non-zero if findings reach this severity: none, warning, critical")
 		f.StringVar(&flagFramework, "framework", "", "only show findings mapped to a compliance framework: pss")
+		f.StringVar(&flagTeam, "team", "", "only show namespace findings owned by this team (see --teams-file/--team-label)")
 		f.IntVar(&flagFailBelow, "fail-below", 0, "exit non-zero if the health score is below this value (0 = disabled)")
 		f.BoolVarP(&flagVerbose, "verbose", "v", false, "show remediation hints for each finding")
 		f.BoolVar(&flagNoColor, "no-color", false, "disable colored output")

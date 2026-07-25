@@ -46,7 +46,7 @@ type Manager struct {
 	timeout      time.Duration
 	historyDir   string
 	historyLimit int
-	notifier     *notify.Notifier
+	notifier     notify.Sink
 	// scan produces a report for one cluster; injectable for tests.
 	scan func(ctx context.Context, c Cluster) (*report.Report, error)
 
@@ -82,7 +82,7 @@ func NewManager(lister ClusterLister, opts analyzer.Options, interval time.Durat
 }
 
 // EnableNotifications posts each cluster's new findings to n after scans.
-func (m *Manager) EnableNotifications(n *notify.Notifier) { m.notifier = n }
+func (m *Manager) EnableNotifications(n notify.Sink) { m.notifier = n }
 
 // SetScanForTest replaces the per-cluster scan function so tests can inject
 // synthetic reports.

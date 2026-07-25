@@ -23,6 +23,12 @@ type Options struct {
 	// ClusterName overrides the display name (defaults to the kube context).
 	ClusterName string
 
+	// TeamOf maps namespaces to owning teams (from the teams file); it wins
+	// over TeamLabel.
+	TeamOf map[string]string
+	// TeamLabel is the namespace label carrying the owning team.
+	TeamLabel string
+
 	// RightsizingReport adds the full per-workload rightsizing section
 	// instead of folding the top recommendations into Optimization.
 	RightsizingReport bool
@@ -71,8 +77,32 @@ func Analyze(ctx context.Context, snapshot *kube.Snapshot, opts Options) *report
 	if opts.PrometheusURL != "" {
 		addRightsizing(ctx, r, snapshot, namespaces, opts)
 	}
+	AssignTeams(r, snapshot, opts.TeamOf, opts.TeamLabel)
 	r.Finalize()
 	return r
+}
+
+// AssignTeams stamps each namespace section with its owning team: the
+// explicit mapping wins, then the namespace label. Exported so lint can
+// apply the same ownership to manifest reports.
+func AssignTeams(r *report.Report, snapshot *kube.Snapshot, teamOf map[string]string, label string) {
+	if len(teamOf) == 0 && label == "" {
+		return
+	}
+	fromLabel := map[string]string{}
+	if label != "" {
+		for _, ns := range snapshot.Namespaces {
+			fromLabel[ns.Name] = ns.Labels[label]
+		}
+	}
+	for i := range r.Namespaces {
+		name := r.Namespaces[i].Name
+		if team := teamOf[name]; team != "" {
+			r.Namespaces[i].Team = team
+		} else {
+			r.Namespaces[i].Team = fromLabel[name]
+		}
+	}
 }
 
 // Lint analyzes a snapshot built from manifests instead of a live cluster:

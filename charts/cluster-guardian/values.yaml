@@ -57,6 +57,19 @@ service:
   type: ClusterIP
   port: 80
 
+# Team ownership: map teams to namespaces to make reports, the dashboard and
+# notifications team-aware. Rendered into a ConfigMap and passed via
+# --teams-file. Namespaces can also carry a label (--team-label, default
+# "team") instead. Example:
+#   teams:
+#     payments-team: [payments, checkout]
+#     platform-team:
+#       namespaces: [monitoring]
+#       notifyUrl: https://hooks.slack.com/services/...
+teams: {}
+# Namespace label carrying the owning team ("" disables label lookup).
+teamLabel: team
+
 notifications:
   # Webhook notified when a run surfaces findings that were not present in
   # the previous run (repeats stay silent).

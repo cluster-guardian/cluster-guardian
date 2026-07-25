@@ -26,7 +26,7 @@ type Server struct {
 	ttl      time.Duration
 	history  *history.Store
 	fleet    *fleet.Manager
-	notifier *notify.Notifier
+	notifier notify.Sink
 
 	mu              sync.Mutex
 	cached          *report.Report
@@ -49,7 +49,7 @@ func New(client *kube.Client, opts analyzer.Options, cacheTTL time.Duration, his
 func (s *Server) EnableFleet(m *fleet.Manager) { s.fleet = m }
 
 // EnableNotifications posts new findings to n after each fresh analysis.
-func (s *Server) EnableNotifications(n *notify.Notifier) { s.notifier = n }
+func (s *Server) EnableNotifications(n notify.Sink) { s.notifier = n }
 
 // Handler returns the HTTP routes for the dashboard, REST API and health probe.
 func (s *Server) Handler() http.Handler {

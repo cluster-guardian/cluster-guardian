@@ -84,6 +84,12 @@ spec:
             {{- with .Values.clusterName }}
             - --cluster-name={{ . }}
             {{- end }}
+            {{- if .Values.teams }}
+            - --teams-file=/etc/cluster-guardian/teams.yaml
+            {{- end }}
+            {{- if ne .Values.teamLabel "team" }}
+            - --team-label={{ .Values.teamLabel }}
+            {{- end }}
             {{- range .Values.extraArgs }}
             - {{ . | quote }}
             {{- end }}
@@ -109,16 +115,30 @@ spec:
             initialDelaySeconds: 3
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          {{- if .Values.persistence.enabled }}
+          {{- if or .Values.persistence.enabled .Values.teams }}
           volumeMounts:
+            {{- if .Values.persistence.enabled }}
             - name: history
               mountPath: /data
+            {{- end }}
+            {{- if .Values.teams }}
+            - name: teams
+              mountPath: /etc/cluster-guardian
+              readOnly: true
+            {{- end }}
           {{- end }}
-      {{- if .Values.persistence.enabled }}
+      {{- if or .Values.persistence.enabled .Values.teams }}
       volumes:
+        {{- if .Values.persistence.enabled }}
         - name: history
           persistentVolumeClaim:
             claimName: {{ include "cluster-guardian.fullname" . }}-history
+        {{- end }}
+        {{- if .Values.teams }}
+        - name: teams
+          configMap:
+            name: {{ include "cluster-guardian.fullname" . }}-teams
+        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
