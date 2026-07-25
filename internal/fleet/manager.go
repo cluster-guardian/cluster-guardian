@@ -14,19 +14,27 @@ import (
 
 // Status is what the fleet API exposes per cluster — never credentials.
 type Status struct {
-	Name     string          `json:"name"`
-	Server   string          `json:"server"`
-	LastScan time.Time       `json:"lastScan"`
-	Error    string          `json:"error,omitempty"`
-	Summary  *report.Summary `json:"summary,omitempty"`
+	Name     string    `json:"name"`
+	Server   string    `json:"server"`
+	LastScan time.Time `json:"lastScan"`
+	// LastScanSeconds is how long the most recent scan took.
+	LastScanSeconds float64 `json:"lastScanSeconds,omitempty"`
+	// Scans and ScanErrors count attempts and failures since process start.
+	Scans      int             `json:"scans"`
+	ScanErrors int             `json:"scanErrors"`
+	Error      string          `json:"error,omitempty"`
+	Summary    *report.Summary `json:"summary,omitempty"`
 }
 
 type clusterState struct {
-	cluster  Cluster
-	report   *report.Report
-	history  *history.Store
-	lastScan time.Time
-	lastErr  error
+	cluster      Cluster
+	report       *report.Report
+	history      *history.Store
+	lastScan     time.Time
+	lastDuration time.Duration
+	lastErr      error
+	scans        int
+	scanErrors   int
 }
 
 // Manager owns the scan schedule and per-cluster state.
@@ -125,13 +133,17 @@ func (m *Manager) ScanAll(ctx context.Context) {
 			defer func() { <-sem }()
 			cctx, cancel := context.WithTimeout(ctx, m.timeout)
 			defer cancel()
+			start := time.Now()
 			r, scanErr := m.scan(cctx, c)
 
 			m.mu.Lock()
 			defer m.mu.Unlock()
 			st := m.states[c.Name]
 			st.lastScan, st.lastErr = time.Now(), scanErr
+			st.lastDuration = time.Since(start)
+			st.scans++
 			if scanErr != nil {
+				st.scanErrors++
 				log.Printf("fleet: scanning %s: %v", c.Name, scanErr)
 				return
 			}
@@ -149,7 +161,14 @@ func (m *Manager) Statuses() []Status {
 	out := make([]Status, 0, len(m.order))
 	for _, name := range m.order {
 		st := m.states[name]
-		s := Status{Name: name, Server: st.cluster.Server, LastScan: st.lastScan}
+		s := Status{
+			Name:            name,
+			Server:          st.cluster.Server,
+			LastScan:        st.lastScan,
+			LastScanSeconds: st.lastDuration.Seconds(),
+			Scans:           st.scans,
+			ScanErrors:      st.scanErrors,
+		}
 		if st.lastErr != nil {
 			s.Error = st.lastErr.Error()
 		}

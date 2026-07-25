@@ -31,6 +31,7 @@ var serveCmd = &cobra.Command{
   GET /                    web dashboard (HTML report)
   GET /api/report          report as JSON (append ?refresh=true to bypass cache)
   GET /api/report/markdown report as Markdown
+  GET /metrics             Prometheus metrics (findings, score, run stats)
   GET /healthz             liveness probe`,
 	RunE: func(_ *cobra.Command, _ []string) error {
 		client, err := newKubeClient()

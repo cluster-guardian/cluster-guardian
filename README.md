@@ -106,7 +106,7 @@ helm install cluster-guardian ./charts/cluster-guardian \
   --set fleet.enabled=true              # multi-cluster scorecard mode
 ```
 
-Key values: `prometheusUrl`, `ingress.*` (or `httpRoute.*` for Gateway API), `persistence.*`, `fleet.*`, `rbac.includeSecrets` (disable to run without cluster-wide Secret read access; the affected checks skip). See [values.yaml](charts/cluster-guardian/values.yaml) for the full list.
+Key values: `prometheusUrl`, `ingress.*` (or `httpRoute.*` for Gateway API), `persistence.*`, `fleet.*`, `serviceMonitor.*`, `rbac.includeSecrets` (disable to run without cluster-wide Secret read access; the affected checks skip). See [values.yaml](charts/cluster-guardian/values.yaml) for the full list.
 
 ## Usage
 
@@ -171,7 +171,26 @@ the dashboard. Pass `--history-dir /path` to persist history across restarts
 | `GET /api/report/markdown` | Report as Markdown                               |
 | `GET /api/history`         | History index: time + severity counts per run    |
 | `GET /api/history/diff`    | New and resolved findings vs the previous run    |
+| `GET /metrics`             | Prometheus metrics: findings, score, run stats   |
 | `GET /healthz`             | Liveness probe                                   |
+
+### Prometheus metrics
+
+`serve` exposes the guardian's own metrics at `/metrics`, rendered from the
+cached report (scraping never triggers an analysis): findings as
+`cluster_guardian_findings{cluster,section,namespace,severity}`, the health
+score, and per-run timestamp, duration and error counters — in fleet mode one
+series set per registered cluster. Alert on them with your existing stack:
+
+```yaml
+- alert: ClusterGuardianCriticalFindings
+  expr: sum by (cluster) (cluster_guardian_findings{severity="critical"}) > 0
+- alert: ClusterGuardianScansStale
+  expr: time() - cluster_guardian_last_run_timestamp_seconds > 3600
+```
+
+With the Helm chart, `--set serviceMonitor.enabled=true` creates a
+ServiceMonitor (requires the Prometheus Operator).
 
 ### Fleet mode: hosted multi-cluster scorecard
 

@@ -26,9 +26,11 @@ type Server struct {
 	history *history.Store
 	fleet   *fleet.Manager
 
-	mu       sync.Mutex
-	cached   *report.Report
-	cachedAt time.Time
+	mu              sync.Mutex
+	cached          *report.Report
+	cachedAt        time.Time
+	lastRunDuration time.Duration
+	runs, runErrors int
 }
 
 // New returns a Server that analyzes via client, caches reports for cacheTTL,
@@ -49,6 +51,7 @@ func (s *Server) Handler() http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+	mux.HandleFunc("GET /metrics", s.handleMetrics)
 	mux.HandleFunc("GET /api/report", s.handleReport(report.WriteJSON, "application/json"))
 	mux.HandleFunc("GET /api/report/markdown", s.handleReport(report.WriteMarkdown, "text/markdown; charset=utf-8"))
 	mux.HandleFunc("GET /api/history", s.handleHistory)
@@ -100,8 +103,12 @@ func (s *Server) report(ctx context.Context, forceRefresh bool) (*report.Report,
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
+	start := time.Now()
 	r, err := analyzer.Run(ctx, s.client, s.opts)
+	s.lastRunDuration = time.Since(start)
+	s.runs++
 	if err != nil {
+		s.runErrors++
 		return nil, err
 	}
 	s.cached, s.cachedAt = r, time.Now()

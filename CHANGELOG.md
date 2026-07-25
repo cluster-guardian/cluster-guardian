@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Prometheus metrics endpoint (#10): serve mode exposes `/metrics` with current findings by cluster/section/namespace/severity, the health score, and per-run timestamp, duration and error counters — rendered from the cached report, so scraping never triggers an analysis. Fleet mode emits one series set per registered cluster, and fleet statuses now report scan counts, failures and durations. The Helm chart can create a ServiceMonitor (`serviceMonitor.enabled`).
+
 - Pod Security Standards compliance mapping: security findings are tagged with the PSS controls they violate, the Security section reports how many observable controls pass, and `--framework pss` filters the report to compliance-relevant findings (#30)
 - Unused and orphaned resource detection: unused ConfigMaps/Secrets (with auto-generated ones excluded), unmounted and unbound PVCs, Services matching no pods, Ingress paths routing to missing Services, HPAs targeting missing workloads, and PDBs selecting nothing (#29). Secret contents are stripped at collection time; only names and types are kept.
 - Certificates section: Ingress TLS certificates expiring within 30 days (critical under 7 days or already expired), Ingresses referencing missing TLS secrets, and cert-manager Certificate resources that are not Ready, detected via the optional-CRD pattern (#22). Only the public `tls.crt` of TLS secrets is retained in memory.
