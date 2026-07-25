@@ -45,19 +45,27 @@ func (s *Severity) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
 	}
+	parsed, err := ParseSeverity(v)
+	if err != nil {
+		return err
+	}
+	*s = parsed
+	return nil
+}
+
+// ParseSeverity converts a severity name into its value.
+func ParseSeverity(v string) (Severity, error) {
 	switch v {
 	case "ok":
-		*s = SeverityOK
+		return SeverityOK, nil
 	case "info":
-		*s = SeverityInfo
+		return SeverityInfo, nil
 	case "warning":
-		*s = SeverityWarning
+		return SeverityWarning, nil
 	case "critical":
-		*s = SeverityCritical
-	default:
-		return fmt.Errorf("unknown severity %q", v)
+		return SeverityCritical, nil
 	}
-	return nil
+	return SeverityOK, fmt.Errorf("unknown severity %q", v)
 }
 
 // Finding is a single observation about the cluster.

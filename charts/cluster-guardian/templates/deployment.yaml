@@ -46,6 +46,13 @@ spec:
             - --fleet
             - --fleet-interval={{ .Values.fleet.interval }}
             {{- end }}
+            {{- with .Values.notifications }}
+            {{- if .url }}
+            - --notify-url={{ .url }}
+            - --notify-format={{ .format }}
+            - --notify-min-severity={{ .minSeverity }}
+            {{- end }}
+            {{- end }}
             {{- with .Values.prometheusUrl }}
             - --prometheus-url={{ . }}
             {{- end }}

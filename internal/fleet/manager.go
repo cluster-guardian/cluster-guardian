@@ -9,6 +9,7 @@ import (
 
 	"github.com/AndrewKarpaty/cluster-guardian/internal/analyzer"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/history"
+	"github.com/AndrewKarpaty/cluster-guardian/internal/notify"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
 )
 
@@ -45,6 +46,7 @@ type Manager struct {
 	timeout      time.Duration
 	historyDir   string
 	historyLimit int
+	notifier     *notify.Notifier
 	// scan produces a report for one cluster; injectable for tests.
 	scan func(ctx context.Context, c Cluster) (*report.Report, error)
 
@@ -78,6 +80,9 @@ func NewManager(lister ClusterLister, opts analyzer.Options, interval time.Durat
 	}
 	return m
 }
+
+// EnableNotifications posts each cluster's new findings to n after scans.
+func (m *Manager) EnableNotifications(n *notify.Notifier) { m.notifier = n }
 
 // Run scans immediately, then on every interval tick until ctx is done.
 func (m *Manager) Run(ctx context.Context) {
@@ -149,9 +154,24 @@ func (m *Manager) ScanAll(ctx context.Context) {
 			}
 			st.report = r
 			st.history.Append(r)
+			if m.notifier != nil {
+				if d := st.history.LastDiff(); d != nil && len(d.New) > 0 {
+					// Post outside the lock: a slow webhook must not block
+					// dashboard reads.
+					go m.postNotification(c.Name, d.New)
+				}
+			}
 		}(c)
 	}
 	wg.Wait()
+}
+
+func (m *Manager) postNotification(cluster string, findings []report.LocatedFinding) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := m.notifier.Notify(ctx, cluster, findings); err != nil {
+		log.Printf("fleet: notify for %s: %v", cluster, err)
+	}
 }
 
 // Statuses lists every known cluster in registry order.

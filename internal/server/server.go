@@ -14,17 +14,19 @@ import (
 	"github.com/AndrewKarpaty/cluster-guardian/internal/fleet"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/history"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/kube"
+	"github.com/AndrewKarpaty/cluster-guardian/internal/notify"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
 )
 
 // Server serves the dashboard and REST API. Reports are cached briefly so a
 // busy dashboard doesn't hammer the API server.
 type Server struct {
-	client  *kube.Client
-	opts    analyzer.Options
-	ttl     time.Duration
-	history *history.Store
-	fleet   *fleet.Manager
+	client   *kube.Client
+	opts     analyzer.Options
+	ttl      time.Duration
+	history  *history.Store
+	fleet    *fleet.Manager
+	notifier *notify.Notifier
 
 	mu              sync.Mutex
 	cached          *report.Report
@@ -43,6 +45,9 @@ func New(client *kube.Client, opts analyzer.Options, cacheTTL time.Duration, his
 // fleet overview and per-cluster routes are served from m. Call before
 // Handler / ListenAndServe.
 func (s *Server) EnableFleet(m *fleet.Manager) { s.fleet = m }
+
+// EnableNotifications posts new findings to n after each fresh analysis.
+func (s *Server) EnableNotifications(n *notify.Notifier) { s.notifier = n }
 
 // Handler returns the HTTP routes for the dashboard, REST API and health probe.
 func (s *Server) Handler() http.Handler {
@@ -114,6 +119,18 @@ func (s *Server) report(ctx context.Context, forceRefresh bool) (*report.Report,
 	s.cached, s.cachedAt = r, time.Now()
 	if s.history != nil {
 		s.history.Append(r)
+		if s.notifier != nil {
+			if d := s.history.LastDiff(); d != nil && len(d.New) > 0 {
+				// Post outside the request path; the run is done either way.
+				go func(findings []report.LocatedFinding) {
+					nctx, ncancel := context.WithTimeout(context.Background(), 15*time.Second)
+					defer ncancel()
+					if err := s.notifier.Notify(nctx, r.ClusterName, findings); err != nil {
+						log.Printf("notify: %v", err)
+					}
+				}(d.New)
+			}
+		}
 	}
 	return r, nil
 }

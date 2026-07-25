@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Webhook notifications for new findings (#11): `serve --notify-url` posts when a run surfaces findings absent from the previous run — repeats stay silent, and the diff's count normalization means changed counts don't re-alert. Slack-compatible (`--notify-format slack`, default) and generic JSON payloads, with a severity threshold (`--notify-min-severity`, default critical). Fleet mode diffs and notifies per cluster. Helm chart wiring under `notifications.*`.
+
 - Supply-chain trust for releases (#48): archives get SPDX SBOMs (syft) and the checksums file a keyless cosign signature; the multi-arch image is cosign-signed by digest and carries BuildKit SBOM + SLSA provenance attestations; release archives get SLSA v1 provenance via slsa-github-generator. Signing or SBOM failures fail the release. README documents the `cosign verify` / `slsa-verifier` one-liners.
 
 - SARIF and JUnit output formats (#12): `-o sarif` emits SARIF 2.1.0 for GitHub code scanning (severities mapped to error/warning/note, count-normalized fingerprints for deduplication, finding objects as location URIs) and `-o junit` emits JUnit XML (warnings/criticals as failures, info/OK as passing cases, hints as failure bodies). Both work in `analyze` and `lint`.

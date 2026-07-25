@@ -3,6 +3,11 @@ package fleet
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,6 +17,7 @@ import (
 
 	"github.com/AndrewKarpaty/cluster-guardian/internal/analyzer"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/kube"
+	"github.com/AndrewKarpaty/cluster-guardian/internal/notify"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
 )
 
@@ -87,6 +93,58 @@ func testFleetReport(msgs ...string) *report.Report {
 type staticLister struct{ clusters []Cluster }
 
 func (l staticLister) Clusters(context.Context) ([]Cluster, error) { return l.clusters, nil }
+
+func TestManagerNotifiesOnlyNewFindings(t *testing.T) {
+	var mu sync.Mutex
+	var bodies []string
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		bodies = append(bodies, string(b))
+		mu.Unlock()
+	}))
+	defer srv.Close()
+	posts := func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(bodies)
+	}
+
+	n, err := notify.New(srv.URL, "slack", "warning")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := NewManager(staticLister{clusters: []Cluster{{Name: "good", Server: "https://good"}}},
+		analyzer.Options{}, time.Minute, "", 10)
+	m.EnableNotifications(n)
+
+	scanWith := func(msgs ...string) {
+		m.scan = func(context.Context, Cluster) (*report.Report, error) {
+			return testFleetReport(msgs...), nil
+		}
+		m.ScanAll(context.Background())
+	}
+
+	scanWith("root containers")                         // first run: nothing to diff against
+	scanWith("root containers", "privileged container") // one new finding -> one post
+	scanWith("root containers", "privileged container") // unchanged -> silent
+
+	deadline := time.Now().Add(2 * time.Second)
+	for posts() < 1 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	time.Sleep(100 * time.Millisecond) // allow any spurious extra posts to land
+	if got := posts(); got != 1 {
+		t.Fatalf("expected exactly 1 notification, got %d: %v", got, bodies)
+	}
+	mu.Lock()
+	body := bodies[0]
+	mu.Unlock()
+	if !strings.Contains(body, "good") || !strings.Contains(body, "privileged container") ||
+		strings.Contains(body, "root containers") {
+		t.Errorf("notification must name the cluster and only the new finding, got: %s", body)
+	}
+}
 
 func TestManagerScanAll(t *testing.T) {
 	lister := staticLister{clusters: []Cluster{

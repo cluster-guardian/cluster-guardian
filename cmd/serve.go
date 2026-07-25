@@ -10,6 +10,7 @@ import (
 
 	"github.com/AndrewKarpaty/cluster-guardian/internal/fleet"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/history"
+	"github.com/AndrewKarpaty/cluster-guardian/internal/notify"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/server"
 )
 
@@ -21,6 +22,9 @@ var (
 	flagFleet         bool
 	flagFleetInterval time.Duration
 	flagFleetNS       string
+	flagNotifyURL     string
+	flagNotifyFormat  string
+	flagNotifyMinSev  string
 )
 
 var serveCmd = &cobra.Command{
@@ -43,6 +47,14 @@ var serveCmd = &cobra.Command{
 			return err
 		}
 		srv := server.New(client, analyzerOptions(), flagCacheTTL, hist)
+		var notifier *notify.Notifier
+		if flagNotifyURL != "" {
+			notifier, err = notify.New(flagNotifyURL, flagNotifyFormat, flagNotifyMinSev)
+			if err != nil {
+				return err
+			}
+			srv.EnableNotifications(notifier)
+		}
 		if flagFleet {
 			reg := &fleet.Registry{
 				Local:     client,
@@ -50,6 +62,9 @@ var serveCmd = &cobra.Command{
 				Namespace: fleetNamespace(),
 			}
 			mgr := fleet.NewManager(reg, analyzerOptions(), flagFleetInterval, flagHistoryDir, flagHistoryLimit)
+			if notifier != nil {
+				mgr.EnableNotifications(notifier)
+			}
 			srv.EnableFleet(mgr)
 			go mgr.Run(context.Background())
 		}
@@ -65,6 +80,9 @@ func init() {
 	serveCmd.Flags().BoolVar(&flagFleet, "fleet", false, "fleet mode: scan clusters registered via labeled Secrets and serve the fleet scorecard")
 	serveCmd.Flags().DurationVar(&flagFleetInterval, "fleet-interval", 5*time.Minute, "how often to scan registered clusters in fleet mode")
 	serveCmd.Flags().StringVar(&flagFleetNS, "fleet-namespace", "", "namespace holding cluster secrets (default: the pod's own namespace)")
+	serveCmd.Flags().StringVar(&flagNotifyURL, "notify-url", "", "webhook URL to notify when a run surfaces new findings")
+	serveCmd.Flags().StringVar(&flagNotifyFormat, "notify-format", "slack", "webhook payload format: slack or json")
+	serveCmd.Flags().StringVar(&flagNotifyMinSev, "notify-min-severity", "critical", "notify only for new findings at or above this severity: info, warning, critical")
 	rootCmd.AddCommand(serveCmd)
 }
 

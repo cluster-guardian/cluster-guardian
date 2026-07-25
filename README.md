@@ -252,6 +252,22 @@ the dashboard. Pass `--history-dir /path` to persist history across restarts
 | `GET /metrics`             | Prometheus metrics: findings, score, run stats   |
 | `GET /healthz`             | Liveness probe                                   |
 
+### Webhook notifications
+
+Serve mode can notify a webhook when a run surfaces findings that were not
+present in the previous run — repeats stay silent, so alerts don't fatigue.
+The diff engine normalizes counts ("5 Pods" → "3 Pods" is not new):
+
+```sh
+cluster-guardian serve \
+  --notify-url https://hooks.slack.com/services/... \
+  --notify-format slack \            # or json for a generic payload
+  --notify-min-severity critical     # info, warning, or critical
+```
+
+In fleet mode each cluster is diffed and notified independently. Helm:
+`notifications.url`, `notifications.format`, `notifications.minSeverity`.
+
 ### Prometheus metrics
 
 `serve` exposes the guardian's own metrics at `/metrics`, rendered from the

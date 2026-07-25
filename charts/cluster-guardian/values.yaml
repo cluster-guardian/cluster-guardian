@@ -57,6 +57,15 @@ service:
   type: ClusterIP
   port: 80
 
+notifications:
+  # Webhook notified when a run surfaces findings that were not present in
+  # the previous run (repeats stay silent).
+  url: ""
+  # Payload format: slack (incoming-webhook text) or json (generic).
+  format: slack
+  # Only notify for new findings at or above this severity.
+  minSeverity: critical
+
 serviceMonitor:
   # Create a ServiceMonitor scraping /metrics (findings by severity/section/
   # namespace, health score, run stats). Requires the Prometheus Operator CRDs.
