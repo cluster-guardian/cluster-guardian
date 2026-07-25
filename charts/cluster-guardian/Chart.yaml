@@ -2,8 +2,8 @@ apiVersion: v2
 name: cluster-guardian
 description: Kubernetes cluster analyzer with a web dashboard — workload health, security, monitoring coverage, GitOps status, cost optimization, and a multi-cluster fleet scorecard.
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.2.0
+appVersion: "0.2.0"
 home: https://github.com/AndrewKarpaty/cluster-guardian
 sources:
   - https://github.com/AndrewKarpaty/cluster-guardian
