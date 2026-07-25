@@ -43,8 +43,9 @@ func failCode(err error) (int, bool) {
 }
 
 var analyzeCmd = &cobra.Command{
-	Use:   "analyze",
-	Short: "Analyze the cluster and print a report",
+	Use:     "analyze",
+	Aliases: []string{"report"},
+	Short:   "Analyze the cluster and print a report",
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		if err := validateFramework(); err != nil {
 			return err
@@ -104,8 +105,13 @@ func finishReport(cmd *cobra.Command, r *report.Report) error {
 		err = report.WriteSARIF(out, r)
 	case "junit":
 		err = report.WriteJUnit(out, r)
+	case "pdf":
+		if flagOutputFile == "" {
+			return fmt.Errorf("-o pdf requires --output-file")
+		}
+		err = report.WritePDF(out, r)
 	default:
-		return fmt.Errorf("unknown output format %q (use terminal, json, markdown, html, sarif or junit)", flagOutput)
+		return fmt.Errorf("unknown output format %q (use terminal, json, markdown, html, sarif, junit or pdf)", flagOutput)
 	}
 	if closer != nil {
 		if cerr := closer.Close(); cerr != nil && err == nil {
@@ -147,7 +153,7 @@ func checkFailThreshold(r *report.Report) error {
 func init() {
 	for _, cmd := range []*cobra.Command{analyzeCmd, rootCmd, lintCmd} {
 		f := cmd.Flags()
-		f.StringVarP(&flagOutput, "output", "o", "terminal", "output format: terminal, json, markdown, html, sarif, junit")
+		f.StringVarP(&flagOutput, "output", "o", "terminal", "output format: terminal, json, markdown, html, sarif, junit, pdf")
 		f.StringVar(&flagOutputFile, "output-file", "", "write the report to a file instead of stdout")
 		f.StringVar(&flagFailOn, "fail-on", "none", "exit non-zero if findings reach this severity: none, warning, critical")
 		f.StringVar(&flagFramework, "framework", "", "only show findings mapped to a compliance framework: pss")

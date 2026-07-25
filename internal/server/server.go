@@ -33,6 +33,8 @@ type Server struct {
 	cachedAt        time.Time
 	lastRunDuration time.Duration
 	runs, runErrors int
+
+	reportDeliveries, reportDeliveryErrors int
 }
 
 // New returns a Server that analyzes via client, caches reports for cacheTTL,

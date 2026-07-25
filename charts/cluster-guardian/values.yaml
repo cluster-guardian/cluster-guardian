@@ -66,6 +66,21 @@ notifications:
   # Only notify for new findings at or above this severity.
   minSeverity: critical
 
+reports:
+  # Cron schedule for report delivery, e.g. "0 8 * * MON" (empty = disabled).
+  schedule: ""
+  # Attachment format: pdf or html.
+  format: pdf
+  # Delivery targets; configure at least one when schedule is set.
+  emailTo: []
+  smtpHost: ""      # host:port
+  smtpFrom: ""
+  # Secret with SMTP_USERNAME / SMTP_PASSWORD keys, exposed as env.
+  smtpSecret: ""
+  webhookUrl: ""
+  # Directory for pull-based workflows (mount your own volume there).
+  dir: ""
+
 serviceMonitor:
   # Create a ServiceMonitor scraping /metrics (findings by severity/section/
   # namespace, health score, run stats). Requires the Prometheus Operator CRDs.

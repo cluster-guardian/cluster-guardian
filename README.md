@@ -252,6 +252,34 @@ the dashboard. Pass `--history-dir /path` to persist history across restarts
 | `GET /metrics`             | Prometheus metrics: findings, score, run stats   |
 | `GET /healthz`             | Liveness probe                                   |
 
+### Scheduled reports and PDF export
+
+Every report renders to PDF — pure Go, offline, no headless browser:
+
+```sh
+cluster-guardian report -o pdf --output-file report.pdf     # report = alias for analyze
+cluster-guardian lint ./deploy -o pdf --output-file lint.pdf
+```
+
+Serve mode delivers reports on a schedule — the artifact leadership actually
+reads. In fleet mode it's a digest (per-cluster grade, score delta since the
+previous scan, new criticals); single-cluster mode attaches the full report:
+
+```sh
+cluster-guardian serve \
+  --report-schedule "0 8 * * MON" \
+  --report-email-to platform-team@example.com \
+  --report-smtp-host smtp.example.com:587 --report-smtp-from guardian@example.com \
+  --report-format pdf                # or html
+```
+
+SMTP credentials come from `SMTP_USERNAME`/`SMTP_PASSWORD`. Other targets:
+`--report-webhook-url` (POSTs the report/digest JSON) and `--report-dir`
+(writes files for pull-based workflows); targets combine, and one failing
+never blocks the others. Deliveries surface in logs and in `/metrics`
+(`cluster_guardian_report_deliveries_total` / `_delivery_errors_total`).
+Helm: `reports.*` values, with `reports.smtpSecret` for credentials.
+
 ### Webhook notifications
 
 Serve mode can notify a webhook when a run surfaces findings that were not

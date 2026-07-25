@@ -84,6 +84,12 @@ func NewManager(lister ClusterLister, opts analyzer.Options, interval time.Durat
 // EnableNotifications posts each cluster's new findings to n after scans.
 func (m *Manager) EnableNotifications(n *notify.Notifier) { m.notifier = n }
 
+// SetScanForTest replaces the per-cluster scan function so tests can inject
+// synthetic reports.
+func (m *Manager) SetScanForTest(scan func(context.Context, Cluster) (*report.Report, error)) {
+	m.scan = scan
+}
+
 // Run scans immediately, then on every interval tick until ctx is done.
 func (m *Manager) Run(ctx context.Context) {
 	m.ScanAll(ctx)

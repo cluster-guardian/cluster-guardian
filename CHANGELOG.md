@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Scheduled report delivery and PDF export (#51): `-o pdf` renders any report (analyze, `report` alias, lint) as a pure-Go PDF — offline, no headless browser. `serve --report-schedule` (cron) delivers on schedule to SMTP email (digest HTML body + attachment; credentials via `SMTP_USERNAME`/`SMTP_PASSWORD`), a webhook (report/digest JSON), and/or a directory. Fleet mode sends a digest with per-cluster grades, score deltas since the previous scan, and new-critical counts; single-cluster mode attaches the full report. Delivery counts and failures are exposed on `/metrics`. Helm wiring under `reports.*`.
+
 - Webhook notifications for new findings (#11): `serve --notify-url` posts when a run surfaces findings absent from the previous run — repeats stay silent, and the diff's count normalization means changed counts don't re-alert. Slack-compatible (`--notify-format slack`, default) and generic JSON payloads, with a severity threshold (`--notify-min-severity`, default critical). Fleet mode diffs and notifies per cluster. Helm chart wiring under `notifications.*`.
 
 - Supply-chain trust for releases (#48): archives get SPDX SBOMs (syft) and the checksums file a keyless cosign signature; the multi-arch image is cosign-signed by digest and carries BuildKit SBOM + SLSA provenance attestations; release archives get SLSA v1 provenance via slsa-github-generator. Signing or SBOM failures fail the release. README documents the `cosign verify` / `slsa-verifier` one-liners.

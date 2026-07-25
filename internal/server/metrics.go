@@ -51,8 +51,14 @@ func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 		}}
 		s.mu.Unlock()
 	}
+	s.mu.Lock()
+	deliveries, deliveryErrors := s.reportDeliveries, s.reportDeliveryErrors
+	s.mu.Unlock()
+
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 	writeMetrics(w, clusters)
+	fmt.Fprintf(w, "# HELP cluster_guardian_report_deliveries_total Scheduled report deliveries attempted since process start.\n# TYPE cluster_guardian_report_deliveries_total counter\ncluster_guardian_report_deliveries_total %d\n", deliveries)
+	fmt.Fprintf(w, "# HELP cluster_guardian_report_delivery_errors_total Failed scheduled report deliveries since process start.\n# TYPE cluster_guardian_report_delivery_errors_total counter\ncluster_guardian_report_delivery_errors_total %d\n", deliveryErrors)
 }
 
 // writeMetrics renders the Prometheus text exposition format by hand — a few

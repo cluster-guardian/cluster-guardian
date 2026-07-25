@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/AndrewKarpaty/cluster-guardian/internal/deliver"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/fleet"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/history"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/notify"
@@ -25,6 +26,14 @@ var (
 	flagNotifyURL     string
 	flagNotifyFormat  string
 	flagNotifyMinSev  string
+
+	flagReportSchedule string
+	flagReportFormat   string
+	flagReportEmailTo  []string
+	flagReportSMTPHost string
+	flagReportSMTPFrom string
+	flagReportWebhook  string
+	flagReportDir      string
 )
 
 var serveCmd = &cobra.Command{
@@ -55,6 +64,21 @@ var serveCmd = &cobra.Command{
 			}
 			srv.EnableNotifications(notifier)
 		}
+		if flagReportSchedule != "" {
+			del, err := deliver.New(deliver.Options{
+				EmailTo:    flagReportEmailTo,
+				SMTPHost:   flagReportSMTPHost,
+				SMTPFrom:   flagReportSMTPFrom,
+				WebhookURL: flagReportWebhook,
+				Dir:        flagReportDir,
+			})
+			if err != nil {
+				return err
+			}
+			if err := srv.StartReportSchedule(flagReportSchedule, del, flagReportFormat); err != nil {
+				return err
+			}
+		}
 		if flagFleet {
 			reg := &fleet.Registry{
 				Local:     client,
@@ -83,6 +107,13 @@ func init() {
 	serveCmd.Flags().StringVar(&flagNotifyURL, "notify-url", "", "webhook URL to notify when a run surfaces new findings")
 	serveCmd.Flags().StringVar(&flagNotifyFormat, "notify-format", "slack", "webhook payload format: slack or json")
 	serveCmd.Flags().StringVar(&flagNotifyMinSev, "notify-min-severity", "critical", "notify only for new findings at or above this severity: info, warning, critical")
+	serveCmd.Flags().StringVar(&flagReportSchedule, "report-schedule", "", `cron schedule for report delivery, e.g. "0 8 * * MON" (empty = disabled)`)
+	serveCmd.Flags().StringVar(&flagReportFormat, "report-format", "pdf", "scheduled report attachment format: pdf or html")
+	serveCmd.Flags().StringSliceVar(&flagReportEmailTo, "report-email-to", nil, "email recipients for scheduled reports (repeatable)")
+	serveCmd.Flags().StringVar(&flagReportSMTPHost, "report-smtp-host", "", "SMTP server as host:port (credentials via SMTP_USERNAME/SMTP_PASSWORD)")
+	serveCmd.Flags().StringVar(&flagReportSMTPFrom, "report-smtp-from", "", "From address for scheduled report emails")
+	serveCmd.Flags().StringVar(&flagReportWebhook, "report-webhook-url", "", "webhook POSTed the report JSON on schedule")
+	serveCmd.Flags().StringVar(&flagReportDir, "report-dir", "", "directory to write scheduled report files into")
 	rootCmd.AddCommand(serveCmd)
 }
 
