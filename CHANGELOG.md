@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Gateway API awareness (#43): Gateways and HTTPRoutes are fetched via the optional-CRD pattern and extend the existing checks — HTTPRoute backendRefs to missing Services join the hygiene findings, Gateway listener `certificateRefs` get the same expiry and missing-secret checks as Ingress TLS, and Gateway-referenced secrets are no longer flagged unused. Cross-namespace refs are skipped (they would need ReferenceGrant evaluation). The chart role and `cluster add` provisioning grant `gateway.networking.k8s.io` read.
+
 - Nodes section (#38): NotReady nodes (critical), memory/disk/PID pressure, cordoned nodes, kubelet version skew beyond the supported 2 minors and mixed kubelet versions, single-zone node pools, control-plane nodes without taints in mixed clusters, and nodes whose summed pod requests exceed ~90% of allocatable. Node listing is optional — without RBAC the section silently skips; the Helm chart role and `cluster add` provisioning now grant nodes read.
 
 - Per-workload rightsizing recommendations (#28): with `--prometheus-url` set, workloads are compared against P50/P95/max usage over a window (`--rightsizing-window`, default 7d) and get concrete suggested requests, a `kubectl patch` snippet in verbose mode, and monthly savings estimates when `--cost-per-cpu`/`--cost-per-gb` are provided. The top recommendations fold into the Optimization section; `--rightsizing-report` adds the full per-workload section to every output format.

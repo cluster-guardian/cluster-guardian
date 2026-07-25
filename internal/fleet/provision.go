@@ -78,6 +78,11 @@ var readOnlyRules = []rbacv1.PolicyRule{
 		Resources: []string{"certificates"},
 		Verbs:     []string{"get", "list"},
 	},
+	{
+		APIGroups: []string{"gateway.networking.k8s.io"},
+		Resources: []string{"gateways", "httproutes"},
+		Verbs:     []string{"get", "list"},
+	},
 }
 
 // ProvisionOptions configure Provision. Zero values use the defaults.

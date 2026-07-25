@@ -17,9 +17,10 @@ const (
 	certCriticalWindow = 7 * 24 * time.Hour
 )
 
-// Certificates flags TLS trouble before it becomes an outage: Ingress TLS
-// certificates near expiry, Ingresses referencing missing TLS secrets, and
-// cert-manager Certificate resources that are not Ready.
+// Certificates flags TLS trouble before it becomes an outage: Ingress and
+// Gateway TLS certificates near expiry, Ingresses and Gateway listeners
+// referencing missing TLS secrets, and cert-manager Certificate resources
+// that are not Ready.
 func Certificates(s *kube.Snapshot, namespaces []string) report.Section {
 	return certificates(s, namespaces, time.Now())
 }
@@ -64,6 +65,40 @@ func certificates(s *kube.Snapshot, namespaces []string, now time.Time) report.S
 						Message:  fmt.Sprintf("Ingress %q references missing TLS secret %q", ing.Namespace+"/"+ing.Name, tls.SecretName),
 						Object:   "ingress/" + ing.Name,
 						Hint:     "HTTPS for these hosts falls back to the controller's default certificate or fails.",
+					})
+				}
+				continue
+			}
+			cert, ok := leafCerts[key]
+			if !ok {
+				continue
+			}
+			reported[key] = true
+			if f := expiryFinding(key, cert, now); f != nil {
+				section.Findings = append(section.Findings, *f)
+			}
+		}
+	}
+
+	// Gateway API listeners reference TLS secrets via certificateRefs; treat
+	// them exactly like Ingress TLS.
+	for _, gw := range s.Gateways {
+		if !nsSet[gw.GetNamespace()] {
+			continue
+		}
+		for _, secretName := range gatewayTLSSecretNames(gw) {
+			key := gw.GetNamespace() + "/" + secretName
+			if reported[key] {
+				continue
+			}
+			if !secretExists[key] {
+				if s.HasSecretAccess {
+					reported[key] = true
+					section.Findings = append(section.Findings, report.Finding{
+						Severity: report.SeverityWarning,
+						Message:  fmt.Sprintf("Gateway %q references missing TLS secret %q", gw.GetNamespace()+"/"+gw.GetName(), secretName),
+						Object:   "gateway/" + gw.GetName(),
+						Hint:     "Listeners with a broken certificateRef serve no TLS or fall back to invalid certificates.",
 					})
 				}
 				continue

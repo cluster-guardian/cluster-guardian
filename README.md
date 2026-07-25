@@ -287,8 +287,8 @@ shown in the terminal header, dashboard, and JSON `summary`.
 | Security     | Root/privileged containers, dangerous capabilities, host network/PID/IPC, missing seccomp profiles, writable root filesystems, ServiceAccount token automounting, Secrets in env vars, namespaces without PSS enforcement labels or NetworkPolicies, wildcard ClusterRoles, cluster-admin ServiceAccounts; findings are tagged with Pod Security Standards controls and summarized per framework |
 | Nodes        | NotReady nodes, memory/disk/PID pressure, cordoned-and-forgotten nodes, kubelet version skew and mixed versions, single-zone pools, untainted control planes, nodes near allocatable limits |
 | Monitoring   | Prometheus/Alertmanager presence, ServiceMonitor scrape coverage, missing alerts for Redis, PostgreSQL, Kafka, and other stateful services |
-| Hygiene      | Unused ConfigMaps and Secrets, unmounted or unbound PVCs, Services matching no pods, Ingress paths to missing Services, HPAs targeting missing workloads, PDBs selecting nothing |
-| Certificates | Ingress TLS certificates expiring within 30 days (critical under 7), Ingresses referencing missing TLS secrets, cert-manager Certificates not Ready |
+| Hygiene      | Unused ConfigMaps and Secrets, unmounted or unbound PVCs, Services matching no pods, Ingress paths and HTTPRoute backends to missing Services, HPAs targeting missing workloads, PDBs selecting nothing |
+| Certificates | Ingress and Gateway TLS certificates expiring within 30 days (critical under 7), Ingresses and Gateway listeners referencing missing TLS secrets, cert-manager Certificates not Ready |
 | Deprecations | Objects still written with deprecated API versions (from managedFields / last-applied), critical when the API is removed in the next minor version or earlier |
 | GitOps       | Argo CD Application health and sync status, Flux Kustomization/HelmRelease readiness                 |
 | Optimization | CPU and memory overprovisioning, estimated from requests vs. actual usage in Prometheus; per-workload rightsizing recommendations with concrete request values, patch snippets and optional savings estimates |

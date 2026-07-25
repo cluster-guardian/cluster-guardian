@@ -27,6 +27,8 @@ var (
 	gvrFluxKustomize   = schema.GroupVersionResource{Group: "kustomize.toolkit.fluxcd.io", Version: "v1", Resource: "kustomizations"}
 	gvrFluxHelm        = schema.GroupVersionResource{Group: "helm.toolkit.fluxcd.io", Version: "v2", Resource: "helmreleases"}
 	gvrCertificate     = schema.GroupVersionResource{Group: "cert-manager.io", Version: "v1", Resource: "certificates"}
+	gvrGateway         = schema.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "gateways"}
+	gvrHTTPRoute       = schema.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "httproutes"}
 )
 
 // SystemNamespaces are excluded from per-namespace workload checks unless
@@ -80,6 +82,10 @@ type Snapshot struct {
 
 	Certificates   []unstructured.Unstructured
 	HasCertManager bool
+
+	Gateways      []unstructured.Unstructured
+	HTTPRoutes    []unstructured.Unstructured
+	HasGatewayAPI bool
 }
 
 // AppNamespaces returns namespaces that per-namespace checks should cover.
@@ -199,6 +205,11 @@ func (c *Client) Collect(ctx context.Context, namespaces []string) (*Snapshot, e
 		s.HasFlux = true
 	}
 	s.Certificates, s.HasCertManager = c.listCRD(ctx, gvrCertificate)
+	s.Gateways, s.HasGatewayAPI = c.listCRD(ctx, gvrGateway)
+	if routes, ok := c.listCRD(ctx, gvrHTTPRoute); ok {
+		s.HTTPRoutes = routes
+		s.HasGatewayAPI = true
+	}
 
 	return s, nil
 }

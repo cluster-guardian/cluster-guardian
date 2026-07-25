@@ -21,7 +21,8 @@ type nsRefs struct {
 
 // unusedFindings reports resources nothing references — deletion candidates
 // (unused ConfigMaps/Secrets, unmounted PVCs) and broken wiring (Services
-// matching no pods, dangling Ingress backends, HPAs and PDBs with no target).
+// matching no pods, dangling Ingress and HTTPRoute backends, HPAs and PDBs
+// with no target).
 // Everything is informational: this is a report, not an accusation.
 func unusedFindings(s *kube.Snapshot, ns string) []report.Finding {
 	refs := referencesIn(s, ns)
@@ -86,6 +87,19 @@ func unusedFindings(s *kube.Snapshot, ns string) []report.Finding {
 		}
 	}
 
+	// HTTPRoute backendRefs pointing at Services that don't exist.
+	var danglingRoutes []string
+	for _, route := range s.HTTPRoutes {
+		if route.GetNamespace() != ns {
+			continue
+		}
+		for _, backend := range httpRouteServiceBackends(route) {
+			if !svcNames[backend] {
+				danglingRoutes = append(danglingRoutes, route.GetName()+" -> "+backend)
+			}
+		}
+	}
+
 	// HPAs whose scale target doesn't exist.
 	workloads := map[string]bool{}
 	for _, d := range s.Deployments {
@@ -137,7 +151,7 @@ func unusedFindings(s *kube.Snapshot, ns string) []report.Finding {
 	add(unusedCM, "unused ConfigMap", "unused ConfigMaps",
 		"Not referenced by any pod, workload template, or projected volume — candidates for deletion.")
 	add(unusedSec, "unused Secret", "unused Secrets",
-		"Not referenced by pods, ServiceAccounts, or Ingress TLS. Verify out-of-band consumers before deleting.")
+		"Not referenced by pods, ServiceAccounts, Ingress TLS, or Gateway TLS. Verify out-of-band consumers before deleting.")
 	add(unmounted, "PVC not mounted by any Pod", "PVCs not mounted by any Pod",
 		"Unattached volumes still incur storage cost.")
 	add(unbound, "unbound PVC", "unbound PVCs",
@@ -145,6 +159,7 @@ func unusedFindings(s *kube.Snapshot, ns string) []report.Finding {
 	add(lonelyServices, "Service with no matching Pods", "Services with no matching Pods",
 		"The selector matches nothing; traffic to these Services goes nowhere.")
 	add(danglingIngress, "Ingress path routing to a missing Service", "Ingress paths routing to missing Services", "")
+	add(danglingRoutes, "HTTPRoute backend routing to a missing Service", "HTTPRoute backends routing to missing Services", "")
 	add(danglingHPA, "HPA targeting a missing workload", "HPAs targeting missing workloads", "")
 	add(emptyPDB, "PodDisruptionBudget selecting no Pods", "PodDisruptionBudgets selecting no Pods",
 		"A PDB that matches nothing protects nothing — the selector is probably stale.")
@@ -236,6 +251,14 @@ func referencesIn(s *kube.Snapshot, ns string) nsRefs {
 		}
 		for _, tls := range ing.Spec.TLS {
 			refs.secrets[tls.SecretName] = true
+		}
+	}
+	for _, gw := range s.Gateways {
+		if gw.GetNamespace() != ns {
+			continue
+		}
+		for _, name := range gatewayTLSSecretNames(gw) {
+			refs.secrets[name] = true
 		}
 	}
 	return refs
