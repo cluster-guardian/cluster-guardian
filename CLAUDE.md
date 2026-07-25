@@ -22,7 +22,7 @@ Running locally requires a reachable cluster via kubeconfig:
 ```sh
 ./cluster-guardian analyze --context <ctx> -n <namespace> --verbose
 ./cluster-guardian serve --listen 127.0.0.1:8080   # dashboard + REST API
-./cluster-guardian docs --output-file CLUSTER.md   # cluster documentation
+./cluster-guardian docs --output-file CLUSTER.md   # cluster documentation (deprecated, removal tracked in #52)
 ```
 
 ## Architecture

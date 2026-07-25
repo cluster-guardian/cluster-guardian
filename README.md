@@ -141,13 +141,12 @@ cluster-guardian analyze -o markdown --output-file report.md
 cluster-guardian analyze -o html     --output-file report.html
 ```
 
-### Cluster documentation
+### Cluster documentation (deprecated)
 
-Generate Markdown documentation of workloads, services, and ingresses:
-
-```sh
-cluster-guardian docs --output-file CLUSTER.md
-```
+The `docs` command (Markdown documentation of workloads, services, and
+ingresses) is deprecated and will be removed in the release after next —
+cluster documentation is out of scope for an analyzer. See
+[#52](https://github.com/AndrewKarpaty/cluster-guardian/issues/52).
 
 ### Web dashboard and REST API
 

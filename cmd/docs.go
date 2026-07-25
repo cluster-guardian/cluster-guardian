@@ -17,6 +17,10 @@ var flagDocsFile string
 var docsCmd = &cobra.Command{
 	Use:   "docs",
 	Short: "Generate Markdown documentation of the cluster's workloads, services and ingresses",
+	// Delete this file and internal/docs in the release after the
+	// deprecation ships (#52).
+	Deprecated: "cluster documentation is out of scope and will be removed in the release after next.\n" +
+		"See https://github.com/AndrewKarpaty/cluster-guardian/issues/52 to object or to adopt it.",
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		client, err := newKubeClient()
 		if err != nil {

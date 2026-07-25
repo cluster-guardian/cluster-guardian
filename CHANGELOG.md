@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fleet mode (#42, phases 1–3; subsumes #20): `serve --fleet` turns the server into a hosted multi-cluster scorecard. Clusters register declaratively via Secrets labeled `cluster-guardian.io/secret-type: cluster` (`name`, `server`, and a `config` JSON with bearer token and CA), the local cluster is included automatically, and a scheduler scans the fleet on `--fleet-interval` with bounded concurrency and per-cluster timeouts. The root page becomes a fleet overview with per-cluster grades linking to scoped dashboards; per-cluster reports, history, and diffs are exposed under `/api/clusters/{name}/...`.
 - Report history and trends (#19): serve mode records every analysis run (`--history-dir` persists them as JSON files across restarts, `--history-limit` caps retention), the dashboard shows a findings-over-time chart and a new/resolved strip, and `/api/history` + `/api/history/diff` expose the data. The run-over-run diff engine (`report.Diff`) normalizes counts in messages so "5 Pods" → "3 Pods" is not reported as a new finding, and is reusable for webhook notifications (#11) and the diff command (#37).
 
+### Deprecated
+
+- The `docs` command (Markdown cluster documentation). Cluster documentation is out of scope for an analyzer and the command will be removed in the release after this one; the dashboard and the planned MCP server mode (#39) cover the "what is running" question. Running it now prints a deprecation notice. (#52)
+
 ### Changed
 
 - Project logo (`assets/logo.svg`) shown in the README, dashboard, and fleet page; both pages now ship a favicon.
