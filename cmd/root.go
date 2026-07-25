@@ -60,9 +60,13 @@ func newKubeClient() (*kube.Client, error) {
 
 func analyzerOptions() analyzer.Options {
 	return analyzer.Options{
-		Namespaces:    flagNamespaces,
-		IncludeSystem: flagIncludeSystem,
-		PrometheusURL: flagPrometheusURL,
-		ClusterName:   flagClusterName,
+		Namespaces:        flagNamespaces,
+		IncludeSystem:     flagIncludeSystem,
+		PrometheusURL:     flagPrometheusURL,
+		ClusterName:       flagClusterName,
+		RightsizingReport: flagRightsizingReport,
+		RightsizingWindow: flagRightsizingWindow,
+		CostPerCPUMonth:   flagCostPerCPU,
+		CostPerGiBMonth:   flagCostPerGB,
 	}
 }

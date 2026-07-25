@@ -16,13 +16,17 @@ import (
 )
 
 var (
-	flagOutput     string
-	flagOutputFile string
-	flagFailOn     string
-	flagVerbose    bool
-	flagNoColor    bool
-	flagFramework  string
-	flagFailBelow  int
+	flagOutput            string
+	flagOutputFile        string
+	flagFailOn            string
+	flagVerbose           bool
+	flagNoColor           bool
+	flagFramework         string
+	flagFailBelow         int
+	flagRightsizingReport bool
+	flagRightsizingWindow time.Duration
+	flagCostPerCPU        float64
+	flagCostPerGB         float64
 )
 
 // failError carries the exit code for --fail-on threshold violations, so CI
@@ -131,6 +135,10 @@ func init() {
 		f.IntVar(&flagFailBelow, "fail-below", 0, "exit non-zero if the health score is below this value (0 = disabled)")
 		f.BoolVarP(&flagVerbose, "verbose", "v", false, "show remediation hints for each finding")
 		f.BoolVar(&flagNoColor, "no-color", false, "disable colored output")
+		f.BoolVar(&flagRightsizingReport, "rightsizing-report", false, "full per-workload rightsizing section (requires --prometheus-url)")
+		f.DurationVar(&flagRightsizingWindow, "rightsizing-window", 7*24*time.Hour, "usage lookback window for rightsizing")
+		f.Float64Var(&flagCostPerCPU, "cost-per-cpu", 0, "monthly cost of one CPU core; enables rightsizing savings estimates")
+		f.Float64Var(&flagCostPerGB, "cost-per-gb", 0, "monthly cost of one GiB of memory; enables rightsizing savings estimates")
 	}
 	rootCmd.AddCommand(analyzeCmd)
 }

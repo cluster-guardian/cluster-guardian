@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Per-workload rightsizing recommendations (#28): with `--prometheus-url` set, workloads are compared against P50/P95/max usage over a window (`--rightsizing-window`, default 7d) and get concrete suggested requests, a `kubectl patch` snippet in verbose mode, and monthly savings estimates when `--cost-per-cpu`/`--cost-per-gb` are provided. The top recommendations fold into the Optimization section; `--rightsizing-report` adds the full per-workload section to every output format.
+
 ## [0.2.0] - 2026-07-25
 
 ### Added

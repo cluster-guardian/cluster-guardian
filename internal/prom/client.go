@@ -39,28 +39,39 @@ type apiResponse struct {
 	Error string `json:"error"`
 }
 
-// QueryScalar runs an instant query and returns the sum of all returned
-// sample values (queries used here aggregate to a single vector element).
-func (c *Client) QueryScalar(ctx context.Context, query string) (float64, error) {
+func (c *Client) query(ctx context.Context, query string) (*apiResponse, error) {
 	u := fmt.Sprintf("%s/api/v1/query?query=%s", c.BaseURL, url.QueryEscape(query))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("prometheus returned HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("prometheus returned HTTP %d", resp.StatusCode)
 	}
 	var body apiResponse
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return 0, fmt.Errorf("decoding response: %w", err)
+		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 	if body.Status != "success" {
-		return 0, fmt.Errorf("query failed: %s", body.Error)
+		return nil, fmt.Errorf("query failed: %s", body.Error)
+	}
+	return &body, nil
+}
+
+// QueryScalar runs an instant query and returns the sum of all returned
+// sample values (queries used here aggregate to a single vector element).
+func (c *Client) QueryScalar(ctx context.Context, query string) (float64, error) {
+	body, err := c.query(ctx, query)
+	if err != nil {
+		return 0, err
+	}
+	if len(body.Data.Result) == 0 {
+		return 0, fmt.Errorf("query returned no data")
 	}
 	var sum float64
 	for _, r := range body.Data.Result {
@@ -70,8 +81,33 @@ func (c *Client) QueryScalar(ctx context.Context, query string) (float64, error)
 			}
 		}
 	}
-	if len(body.Data.Result) == 0 {
-		return 0, fmt.Errorf("query returned no data")
-	}
 	return sum, nil
+}
+
+// Sample is one element of an instant-query result vector.
+type Sample struct {
+	Labels map[string]string
+	Value  float64
+}
+
+// QueryVector runs an instant query and returns every sample with its
+// labels. An empty result is not an error.
+func (c *Client) QueryVector(ctx context.Context, query string) ([]Sample, error) {
+	body, err := c.query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Sample, 0, len(body.Data.Result))
+	for _, r := range body.Data.Result {
+		s, ok := r.Value[1].(string)
+		if !ok {
+			continue
+		}
+		v, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			continue
+		}
+		out = append(out, Sample{Labels: r.Metric, Value: v})
+	}
+	return out, nil
 }

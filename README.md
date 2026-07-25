@@ -133,6 +133,24 @@ kubectl port-forward -n monitoring svc/prometheus-operated 9090:9090
 cluster-guardian --prometheus-url http://localhost:9090
 ```
 
+### Rightsizing recommendations
+
+With `--prometheus-url` set, the report also recommends concrete per-workload
+requests: current values vs P50/P95/max usage over the last 7 days
+(`--rightsizing-window`), with a suggested `cpu:`/`memory:` block and — in
+`--verbose` mode — a ready-to-apply `kubectl patch` snippet. The top
+recommendations appear in the Optimization section; `--rightsizing-report`
+adds a full per-workload section (also in JSON/Markdown/HTML exports). Add
+cost hints for monthly savings estimates:
+
+```sh
+cluster-guardian --prometheus-url http://localhost:9090 \
+  --rightsizing-report --cost-per-cpu 15 --cost-per-gb 2 -v
+```
+
+Unlike Goldilocks (needs the VPA) or cost platforms, this is read-only and
+uses the Prometheus you already have.
+
 ### Export reports
 
 ```sh
@@ -272,7 +290,7 @@ shown in the terminal header, dashboard, and JSON `summary`.
 | Certificates | Ingress TLS certificates expiring within 30 days (critical under 7), Ingresses referencing missing TLS secrets, cert-manager Certificates not Ready |
 | Deprecations | Objects still written with deprecated API versions (from managedFields / last-applied), critical when the API is removed in the next minor version or earlier |
 | GitOps       | Argo CD Application health and sync status, Flux Kustomization/HelmRelease readiness                 |
-| Optimization | CPU and memory overprovisioning, estimated from requests vs. actual usage in Prometheus              |
+| Optimization | CPU and memory overprovisioning, estimated from requests vs. actual usage in Prometheus; per-workload rightsizing recommendations with concrete request values, patch snippets and optional savings estimates |
 
 System namespaces (`kube-system`, etc.) are skipped by default; include them with `--include-system`.
 

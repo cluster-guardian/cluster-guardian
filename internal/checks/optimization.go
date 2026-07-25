@@ -41,7 +41,7 @@ func Optimization(ctx context.Context, s *kube.Snapshot, namespaces []string, pr
 	}
 
 	client := prom.NewClient(prometheusURL)
-	nsMatcher := fmt.Sprintf(`namespace=~"%s"`, strings.Join(namespaces, "|"))
+	nsMatcher := promNamespaceMatcher(namespaces)
 
 	cpuUsage, cpuErr := client.QueryScalar(ctx,
 		fmt.Sprintf(`sum(rate(container_cpu_usage_seconds_total{%s,container!="",container!="POD"}[5m]))`, nsMatcher))
