@@ -39,7 +39,7 @@ The core design is **snapshot → pure checks → report → renderers**:
 
 Conventions that matter when extending it:
 
-- **Optional CRDs** (ServiceMonitors, Argo CD Applications, Flux resources, cert-manager Certificates, Gateway API Gateways/HTTPRoutes) are fetched via the dynamic client as `unstructured.Unstructured`; a nil slice in `Snapshot` means the CRD is not installed, and checks must degrade gracefully. GVRs are declared at the top of `internal/kube/snapshot.go`.
+- **Optional CRDs** (ServiceMonitors, Argo CD Applications, Flux resources, cert-manager Certificates, Gateway API Gateways/HTTPRoutes, Kyverno PolicyReports/Policies, Gatekeeper constraints) are fetched via the dynamic client as `unstructured.Unstructured`; a nil slice in `Snapshot` means the CRD is not installed, and checks must degrade gracefully. GVRs are declared at the top of `internal/kube/snapshot.go`.
 - **System namespaces** (`kube-system`, etc.) are excluded from per-namespace checks unless `--include-system`; the list is `kube.SystemNamespaces`.
 - **Exit codes** are part of the CI contract: `--fail-on` returns exit 2 (warning) / 3 (critical) via the `failError` type in `cmd/analyze.go`; plain errors exit 1.
 - A new check area = a new file in `internal/checks` returning a `report.Section`, wired into the `Sections` list in `internal/analyzer/analyzer.go`.

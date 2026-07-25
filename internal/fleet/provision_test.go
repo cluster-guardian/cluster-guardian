@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -43,12 +44,19 @@ func TestProvision(t *testing.T) {
 		t.Fatalf("expected clusterrole to be created: %v", err)
 	}
 	for _, rule := range role.Rules {
-		for _, list := range [][]string{rule.Verbs, rule.APIGroups, rule.Resources} {
+		// Verbs and groups must never be wildcarded; a resource wildcard is
+		// allowed only when scoped to a specific group (Gatekeeper constraint
+		// kinds are dynamic). The tool's own RBAC check flags */*/* roles.
+		for _, list := range [][]string{rule.Verbs, rule.APIGroups} {
 			for _, v := range list {
 				if v == "*" {
-					t.Errorf("provisioned role must not contain wildcards, got rule %+v", rule)
+					t.Errorf("provisioned role must not wildcard verbs or groups, got rule %+v", rule)
 				}
 			}
+		}
+		if slices.Contains(rule.Resources, "*") &&
+			(len(rule.APIGroups) != 1 || rule.APIGroups[0] != "constraints.gatekeeper.sh") {
+			t.Errorf("resource wildcard only allowed for the gatekeeper constraint group, got rule %+v", rule)
 		}
 		for _, verb := range rule.Verbs {
 			if verb != "get" && verb != "list" {

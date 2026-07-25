@@ -29,7 +29,16 @@ var (
 	gvrCertificate     = schema.GroupVersionResource{Group: "cert-manager.io", Version: "v1", Resource: "certificates"}
 	gvrGateway         = schema.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "gateways"}
 	gvrHTTPRoute       = schema.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "httproutes"}
+
+	gvrPolicyReport         = schema.GroupVersionResource{Group: "wgpolicyk8s.io", Version: "v1alpha2", Resource: "policyreports"}
+	gvrKyvernoPolicy        = schema.GroupVersionResource{Group: "kyverno.io", Version: "v1", Resource: "policies"}
+	gvrKyvernoClusterPolicy = schema.GroupVersionResource{Group: "kyverno.io", Version: "v1", Resource: "clusterpolicies"}
+	gvrCRD                  = schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}
 )
+
+// gatekeeperConstraintGroup is the API group Gatekeeper creates one CRD per
+// constraint kind in.
+const gatekeeperConstraintGroup = "constraints.gatekeeper.sh"
 
 // SystemNamespaces are excluded from per-namespace workload checks unless
 // --include-system is set.
@@ -86,6 +95,15 @@ type Snapshot struct {
 	Gateways      []unstructured.Unstructured
 	HTTPRoutes    []unstructured.Unstructured
 	HasGatewayAPI bool
+
+	// Policy engines. Constraints holds instances of every
+	// constraints.gatekeeper.sh kind, discovered dynamically.
+	KyvernoPolicyReports   []unstructured.Unstructured
+	KyvernoPolicies        []unstructured.Unstructured
+	KyvernoClusterPolicies []unstructured.Unstructured
+	HasKyverno             bool
+	GatekeeperConstraints  []unstructured.Unstructured
+	HasGatekeeper          bool
 }
 
 // AppNamespaces returns namespaces that per-namespace checks should cover.
@@ -211,7 +229,62 @@ func (c *Client) Collect(ctx context.Context, namespaces []string) (*Snapshot, e
 		s.HasGatewayAPI = true
 	}
 
+	s.KyvernoPolicyReports, s.HasKyverno = c.listCRD(ctx, gvrPolicyReport)
+	if pols, ok := c.listCRD(ctx, gvrKyvernoPolicy); ok {
+		s.KyvernoPolicies = pols
+		s.HasKyverno = true
+	}
+	if pols, ok := c.listCRD(ctx, gvrKyvernoClusterPolicy); ok {
+		s.KyvernoClusterPolicies = pols
+		s.HasKyverno = true
+	}
+	s.GatekeeperConstraints, s.HasGatekeeper = c.listGatekeeperConstraints(ctx)
+
 	return s, nil
+}
+
+// listGatekeeperConstraints discovers Gatekeeper constraint kinds (one CRD
+// per kind, created from ConstraintTemplates) and lists their instances.
+// ok reports whether Gatekeeper is installed at all.
+func (c *Client) listGatekeeperConstraints(ctx context.Context) ([]unstructured.Unstructured, bool) {
+	crds, ok := c.listCRD(ctx, gvrCRD)
+	if !ok {
+		return nil, false
+	}
+	installed := false
+	var out []unstructured.Unstructured
+	for _, crd := range crds {
+		group, _, _ := unstructured.NestedString(crd.Object, "spec", "group")
+		if group != gatekeeperConstraintGroup {
+			continue
+		}
+		installed = true
+		plural, _, _ := unstructured.NestedString(crd.Object, "spec", "names", "plural")
+		version := servedCRDVersion(crd)
+		if plural == "" || version == "" {
+			continue
+		}
+		items, _ := c.listCRD(ctx, schema.GroupVersionResource{Group: group, Version: version, Resource: plural})
+		out = append(out, items...)
+	}
+	return out, installed
+}
+
+// servedCRDVersion returns the first served version of a CRD.
+func servedCRDVersion(crd unstructured.Unstructured) string {
+	versions, _, _ := unstructured.NestedSlice(crd.Object, "spec", "versions")
+	for _, v := range versions {
+		vm, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		if served, _, _ := unstructured.NestedBool(vm, "served"); !served {
+			continue
+		}
+		name, _, _ := unstructured.NestedString(vm, "name")
+		return name
+	}
+	return ""
 }
 
 func (c *Client) listCRD(ctx context.Context, gvr schema.GroupVersionResource) ([]unstructured.Unstructured, bool) {

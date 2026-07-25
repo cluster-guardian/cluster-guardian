@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Policy section (#35): aggregates policy-engine state into the report — Kyverno PolicyReport failures summed per namespace, Gatekeeper constraint violations from audit status (constraint kinds discovered dynamically via the CRD list), info findings when an engine is installed with zero policies/constraints, and a coverage-gap warning for namespaces with pods that no admission policy covers. Silent when neither engine is installed. Chart role and `cluster add` provisioning grant the required reads.
+
 - Gateway API awareness (#43): Gateways and HTTPRoutes are fetched via the optional-CRD pattern and extend the existing checks — HTTPRoute backendRefs to missing Services join the hygiene findings, Gateway listener `certificateRefs` get the same expiry and missing-secret checks as Ingress TLS, and Gateway-referenced secrets are no longer flagged unused. Cross-namespace refs are skipped (they would need ReferenceGrant evaluation). The chart role and `cluster add` provisioning grant `gateway.networking.k8s.io` read.
 
 - Nodes section (#38): NotReady nodes (critical), memory/disk/PID pressure, cordoned nodes, kubelet version skew beyond the supported 2 minors and mixed kubelet versions, single-zone node pools, control-plane nodes without taints in mixed clusters, and nodes whose summed pod requests exceed ~90% of allocatable. Node listing is optional — without RBAC the section silently skips; the Helm chart role and `cluster add` provisioning now grant nodes read.

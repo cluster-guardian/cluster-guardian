@@ -83,6 +83,28 @@ var readOnlyRules = []rbacv1.PolicyRule{
 		Resources: []string{"gateways", "httproutes"},
 		Verbs:     []string{"get", "list"},
 	},
+	{
+		APIGroups: []string{"apiextensions.k8s.io"},
+		Resources: []string{"customresourcedefinitions"},
+		Verbs:     []string{"get", "list"},
+	},
+	{
+		APIGroups: []string{"wgpolicyk8s.io"},
+		Resources: []string{"policyreports"},
+		Verbs:     []string{"get", "list"},
+	},
+	{
+		APIGroups: []string{"kyverno.io"},
+		Resources: []string{"policies", "clusterpolicies"},
+		Verbs:     []string{"get", "list"},
+	},
+	{
+		// Gatekeeper creates one CRD per constraint kind; the resource set
+		// is dynamic, so the wildcard is scoped to this group only.
+		APIGroups: []string{"constraints.gatekeeper.sh"},
+		Resources: []string{"*"},
+		Verbs:     []string{"get", "list"},
+	},
 }
 
 // ProvisionOptions configure Provision. Zero values use the defaults.
