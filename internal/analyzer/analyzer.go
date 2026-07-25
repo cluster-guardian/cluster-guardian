@@ -75,6 +75,30 @@ func Analyze(ctx context.Context, snapshot *kube.Snapshot, opts Options) *report
 	return r
 }
 
+// Lint analyzes a snapshot built from manifests instead of a live cluster:
+// only the cluster-agnostic checks run (workloads, security, hygiene,
+// certificates, deprecated APIs). Live-only sections — pod health status is
+// naturally absent, and monitoring coverage, GitOps state, usage-based
+// optimization, policy-engine state and node checks need an API server — are
+// skipped.
+func Lint(snapshot *kube.Snapshot, namespaces []string, clusterName string) *report.Report {
+	if clusterName == "" {
+		clusterName = "manifests"
+	}
+	r := &report.Report{
+		ClusterName: clusterName,
+		GeneratedAt: time.Now().UTC(),
+		Namespaces:  checks.Namespaces(snapshot, namespaces),
+		Sections: []report.Section{
+			checks.Security(snapshot, namespaces),
+			checks.Certificates(snapshot, namespaces),
+			checks.Deprecations(snapshot, namespaces),
+		},
+	}
+	r.Finalize()
+	return r
+}
+
 // topRightsizing caps how many recommendations are folded into the
 // Optimization section when the full report is not requested.
 const topRightsizing = 3

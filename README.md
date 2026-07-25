@@ -62,6 +62,7 @@ Cluster Guardian is an open-source tool that analyzes Kubernetes clusters and pr
 * Automatic cluster documentation generation
 * Cluster health score (0–100) and A–F grades, with `--fail-below` gating
 * Fleet mode: hosted multi-cluster scorecard with declarative, Secret-based cluster registration
+* Static manifest linting (`lint`): the same rule set pre-deploy, no cluster needed
 * Export reports in JSON, Markdown, and HTML
 * REST API and Web Dashboard
 * CLI for automation and CI/CD integration
@@ -150,6 +151,25 @@ cluster-guardian --prometheus-url http://localhost:9090 \
 
 Unlike Goldilocks (needs the VPA) or cost platforms, this is read-only and
 uses the Prometheus you already have.
+
+### Lint manifests without a cluster
+
+`lint` runs the cluster-agnostic checks (workloads, security, hygiene,
+certificates, deprecated APIs) over local YAML — files, directories, or
+stdin — with the same findings, severities, output formats and exit-code
+gating as `analyze`. One rule set pre- and post-deploy, no drift between
+what you lint in CI and what you audit in the cluster:
+
+```sh
+helm template ./chart | cluster-guardian lint - --fail-on critical
+kustomize build ./overlays/prod | cluster-guardian lint -
+cluster-guardian lint ./deploy -o json
+```
+
+Live-only checks (pod health, monitoring coverage, GitOps, usage-based
+optimization, policy engines, nodes) are skipped automatically. Lint assumes
+a self-contained manifest set (a rendered chart or overlay), so references
+to objects that only exist in the live cluster surface as findings.
 
 ### Export reports
 

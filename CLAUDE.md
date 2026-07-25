@@ -33,7 +33,7 @@ The core design is **snapshot → pure checks → report → renderers**:
 2. `internal/checks` — each file (`workloads.go`, `security.go`, `monitoring.go`, `gitops.go`, `optimization.go`) is a pure function `Snapshot → report.Section` (or per-namespace sections). Purity is deliberate: tests feed synthetic snapshots, no fakes or mocks needed (see `checks_test.go`).
 3. `internal/analyzer` — orchestration. `Run()` = collect + analyze; `Analyze()` is split out so tests can inject snapshots.
 4. `internal/report` — the `Report`/`Section`/`Finding` model and four renderers: terminal (color), JSON, Markdown, HTML. `Severity` marshals to/from strings in JSON.
-5. `cmd` — cobra CLI (`analyze` is also the root command's default action; `serve`, `docs`, `cluster add`, `version`). Persistent flags (kubeconfig, context, namespaces, prometheus-url) live in `root.go`.
+5. `cmd` — cobra CLI (`analyze` is also the root command's default action; `serve`, `lint`, `docs`, `cluster add`, `version`). Persistent flags (kubeconfig, context, namespaces, prometheus-url) live in `root.go`. `internal/manifest` builds a Snapshot from YAML for `lint`, which runs only the cluster-agnostic checks via `analyzer.Lint`.
 6. `internal/server` — HTTP wrapper around the analyzer with a TTL report cache; `?refresh=true` bypasses it. Routes use Go 1.22+ method patterns (`GET /{$}`).
 7. `internal/prom` — minimal Prometheus HTTP API client used only by the optimization check when `--prometheus-url` is set.
 
