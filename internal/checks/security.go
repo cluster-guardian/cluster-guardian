@@ -100,9 +100,130 @@ func Security(s *kube.Snapshot, namespaces []string) report.Section {
 		})
 	}
 
+	sec.Findings = append(sec.Findings, hardeningFindings(s, nsSet)...)
+	sec.Findings = append(sec.Findings, pssLabelFindings(s, nsSet)...)
 	sec.Findings = append(sec.Findings, rbacFindings(s)...)
 	sec.Findings = append(sec.Findings, complianceSummary(sec.Findings))
 	return sec
+}
+
+// pssEnforceLabel gates pods at admission when set on a namespace.
+const pssEnforceLabel = "pod-security.kubernetes.io/enforce"
+
+// pssLabelFindings flags analyzed namespaces without Pod Security Standards
+// enforcement. Only namespaces present in the snapshot are judged.
+func pssLabelFindings(s *kube.Snapshot, nsSet map[string]bool) []report.Finding {
+	var unlabeled []string
+	for _, ns := range s.Namespaces {
+		if nsSet[ns.Name] && ns.Labels[pssEnforceLabel] == "" {
+			unlabeled = append(unlabeled, ns.Name)
+		}
+	}
+	if len(unlabeled) == 0 {
+		return nil
+	}
+	return []report.Finding{{
+		Severity: report.SeverityWarning,
+		Message: fmt.Sprintf("%d %s without Pod Security Standards enforcement (%s)",
+			len(unlabeled), plural(len(unlabeled), "namespace", "namespaces"), joinLimited(unlabeled, 4)),
+		Hint: "Set the " + pssEnforceLabel + " label (baseline or restricted) so violating pods are rejected at admission.",
+	}}
+}
+
+// hardeningFindings covers workload hardening: readOnlyRootFilesystem,
+// seccomp profiles, ServiceAccount token automounting and Secrets passed
+// through environment variables.
+func hardeningFindings(s *kube.Snapshot, nsSet map[string]bool) []report.Finding {
+	// ServiceAccounts that disable token automounting for their pods.
+	noAutomountSA := map[string]bool{}
+	for _, sa := range s.ServiceAccounts {
+		if sa.AutomountServiceAccountToken != nil && !*sa.AutomountServiceAccountToken {
+			noAutomountSA[sa.Namespace+"/"+sa.Name] = true
+		}
+	}
+
+	var writableRoot, noSeccomp, automount, secretEnv int
+	for _, pod := range s.Pods {
+		if !nsSet[pod.Namespace] || pod.Status.Phase == corev1.PodSucceeded {
+			continue
+		}
+
+		if pod.Spec.AutomountServiceAccountToken == nil || *pod.Spec.AutomountServiceAccountToken {
+			saName := pod.Spec.ServiceAccountName
+			if saName == "" {
+				saName = "default"
+			}
+			if !noAutomountSA[pod.Namespace+"/"+saName] {
+				automount++
+			}
+		}
+
+		podSeccomp := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SeccompProfile != nil
+		missingSeccomp := false
+		for _, c := range pod.Spec.Containers {
+			sc := c.SecurityContext
+			if sc == nil || sc.ReadOnlyRootFilesystem == nil || !*sc.ReadOnlyRootFilesystem {
+				writableRoot++
+			}
+			if !podSeccomp && (sc == nil || sc.SeccompProfile == nil) {
+				missingSeccomp = true
+			}
+			if usesSecretEnv(c) {
+				secretEnv++
+			}
+		}
+		if missingSeccomp {
+			noSeccomp++
+		}
+	}
+
+	var out []report.Finding
+	if noSeccomp > 0 {
+		out = append(out, report.Finding{
+			Severity: report.SeverityWarning,
+			Message:  fmt.Sprintf("%d %s without a seccomp profile", noSeccomp, plural(noSeccomp, "Pod", "Pods")),
+			Hint:     "Set securityContext.seccompProfile.type: RuntimeDefault to filter dangerous syscalls.",
+			Controls: []string{ctrlSeccomp},
+		})
+	}
+	if writableRoot > 0 {
+		out = append(out, report.Finding{
+			Severity: report.SeverityInfo,
+			Message:  fmt.Sprintf("%d %s without readOnlyRootFilesystem", writableRoot, plural(writableRoot, "container", "containers")),
+			Hint:     "A writable root filesystem lets a compromised process modify its own image at runtime.",
+		})
+	}
+	if automount > 0 {
+		out = append(out, report.Finding{
+			Severity: report.SeverityInfo,
+			Message:  fmt.Sprintf("%d %s automounting ServiceAccount tokens", automount, plural(automount, "Pod", "Pods")),
+			Hint:     "Set automountServiceAccountToken: false on pods (or their ServiceAccount) that don't call the Kubernetes API.",
+		})
+	}
+	if secretEnv > 0 {
+		out = append(out, report.Finding{
+			Severity: report.SeverityInfo,
+			Message:  fmt.Sprintf("%d %s receiving Secrets via environment variables", secretEnv, plural(secretEnv, "container", "containers")),
+			Hint:     "Env vars leak into logs, crash dumps and child processes; prefer mounting Secrets as files.",
+		})
+	}
+	return out
+}
+
+// usesSecretEnv reports whether a container pulls Secret data into its
+// environment via env valueFrom or envFrom.
+func usesSecretEnv(c corev1.Container) bool {
+	for _, e := range c.Env {
+		if e.ValueFrom != nil && e.ValueFrom.SecretKeyRef != nil {
+			return true
+		}
+	}
+	for _, ef := range c.EnvFrom {
+		if ef.SecretRef != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func runsAsRoot(podSC *corev1.PodSecurityContext, sc *corev1.SecurityContext) bool {

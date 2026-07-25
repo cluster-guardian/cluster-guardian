@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Extended security checks (#17): namespaces without a Pod Security Standards enforcement label, pods without a seccomp profile (tagged with the PSS `restricted` seccomp control, so the compliance summary now covers 5 controls), containers without `readOnlyRootFilesystem`, pods automounting ServiceAccount tokens (respecting opt-outs on the pod or its ServiceAccount), and containers receiving Secrets via environment variables.
+
 - Prometheus metrics endpoint (#10): serve mode exposes `/metrics` with current findings by cluster/section/namespace/severity, the health score, and per-run timestamp, duration and error counters — rendered from the cached report, so scraping never triggers an analysis. Fleet mode emits one series set per registered cluster, and fleet statuses now report scan counts, failures and durations. The Helm chart can create a ServiceMonitor (`serviceMonitor.enabled`).
 
 - Pod Security Standards compliance mapping: security findings are tagged with the PSS controls they violate, the Security section reports how many observable controls pass, and `--framework pss` filters the report to compliance-relevant findings (#30)

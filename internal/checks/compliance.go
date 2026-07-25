@@ -22,6 +22,7 @@ const (
 	ctrlHostNamespaces = "PSS/baseline:host-namespaces"
 	ctrlCapabilities   = "PSS/baseline:capabilities"
 	ctrlRunAsNonRoot   = "PSS/restricted:run-as-nonroot"
+	ctrlSeccomp        = "PSS/restricted:seccomp"
 )
 
 var pssControls = []complianceControl{
@@ -29,6 +30,7 @@ var pssControls = []complianceControl{
 	{ID: ctrlHostNamespaces, Name: "Host Namespaces"},
 	{ID: ctrlCapabilities, Name: "Capabilities"},
 	{ID: ctrlRunAsNonRoot, Name: "Running as Non-root"},
+	{ID: ctrlSeccomp, Name: "Seccomp Profile"},
 }
 
 // complianceSummary reports how many PSS controls pass given the security

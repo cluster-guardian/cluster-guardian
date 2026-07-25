@@ -332,8 +332,8 @@ func TestSecurity(t *testing.T) {
 		t.Errorf("expected cluster-admin ServiceAccount finding, got: %+v", messages(fs))
 	}
 
-	// PSS mapping: privileged and run-as-root fail, host namespaces and
-	// capabilities pass -> 2 of 4.
+	// PSS mapping: privileged, run-as-root and seccomp fail; host namespaces
+	// and capabilities pass -> 2 of 5.
 	if f := findMessage(fs, "privileged"); f == nil || len(f.Controls) == 0 || f.Controls[0] != "PSS/baseline:privileged" {
 		t.Errorf("privileged finding should be tagged with its PSS control, got: %+v", f)
 	}
@@ -341,10 +341,77 @@ func TestSecurity(t *testing.T) {
 	if f == nil {
 		t.Fatalf("expected a PSS compliance summary, got: %+v", messages(fs))
 	}
-	if !strings.Contains(f.Message, "2 of 4") ||
+	if !strings.Contains(f.Message, "2 of 5") ||
 		!strings.Contains(f.Message, "Privileged Containers") ||
-		!strings.Contains(f.Message, "Running as Non-root") {
+		!strings.Contains(f.Message, "Running as Non-root") ||
+		!strings.Contains(f.Message, "Seccomp Profile") {
 		t.Errorf("unexpected PSS summary: %q", f.Message)
+	}
+}
+
+func TestSecurityHardening(t *testing.T) {
+	namespace := func(name string, labels map[string]string) corev1.Namespace {
+		return corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels}}
+	}
+	s := &kube.Snapshot{
+		Namespaces: []corev1.Namespace{
+			namespace("payments", nil), // no PSS enforcement
+			namespace("secure", map[string]string{"pod-security.kubernetes.io/enforce": "restricted"}),
+			namespace("kube-system", nil), // not analyzed, never flagged
+		},
+		ServiceAccounts: []corev1.ServiceAccount{{
+			ObjectMeta:                   metav1.ObjectMeta{Namespace: "payments", Name: "no-token-sa"},
+			AutomountServiceAccountToken: new(false),
+		}},
+		Pods: []corev1.Pod{
+			// Fully hardened: contributes to no finding.
+			pod("secure", "hardened", func(p *corev1.Pod) {
+				p.Spec.SecurityContext = &corev1.PodSecurityContext{
+					SeccompProfile: &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+				}
+				p.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
+					ReadOnlyRootFilesystem: new(true),
+				}
+				p.Spec.AutomountServiceAccountToken = new(false)
+			}),
+			// Defaults everywhere: writable root, no seccomp, automounts the
+			// token, and pulls a Secret into the environment.
+			pod("payments", "soft", func(p *corev1.Pod) {
+				p.Spec.Containers[0].EnvFrom = []corev1.EnvFromSource{
+					{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "creds"}}},
+				}
+			}),
+			// Token automount disabled on the ServiceAccount instead of the pod.
+			pod("payments", "sa-opt-out", func(p *corev1.Pod) {
+				p.Spec.ServiceAccountName = "no-token-sa"
+			}),
+		},
+	}
+
+	fs := Security(s, []string{"payments", "secure"}).Findings
+
+	if f := findMessage(fs, "without Pod Security Standards enforcement"); f == nil ||
+		f.Severity != report.SeverityWarning ||
+		!strings.Contains(f.Message, "payments") || strings.Contains(f.Message, "secure") {
+		t.Errorf("expected only payments flagged without PSS enforcement, got: %+v", messages(fs))
+	}
+	if f := findMessage(fs, "without a seccomp profile"); f == nil ||
+		f.Severity != report.SeverityWarning || !strings.HasPrefix(f.Message, "2 ") ||
+		len(f.Controls) == 0 || f.Controls[0] != "PSS/restricted:seccomp" {
+		t.Errorf("expected 2 pods without seccomp tagged with the PSS control, got: %+v", messages(fs))
+	}
+	if f := findMessage(fs, "without readOnlyRootFilesystem"); f == nil ||
+		f.Severity != report.SeverityInfo || !strings.HasPrefix(f.Message, "2 ") {
+		t.Errorf("expected 2 containers without readOnlyRootFilesystem, got: %+v", messages(fs))
+	}
+	// hardened opts out at the pod, sa-opt-out via its ServiceAccount.
+	if f := findMessage(fs, "automounting ServiceAccount tokens"); f == nil ||
+		f.Severity != report.SeverityInfo || !strings.HasPrefix(f.Message, "1 ") {
+		t.Errorf("expected 1 pod automounting its token, got: %+v", messages(fs))
+	}
+	if f := findMessage(fs, "receiving Secrets via environment variables"); f == nil ||
+		f.Severity != report.SeverityInfo || !strings.HasPrefix(f.Message, "1 ") {
+		t.Errorf("expected 1 container with secret env vars, got: %+v", messages(fs))
 	}
 }
 
