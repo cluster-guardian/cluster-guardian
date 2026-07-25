@@ -4,6 +4,12 @@
 
 Only the latest release of cluster-guardian receives security fixes.
 
+## Release integrity
+
+Releases are cosign-signed (keyless, GitHub OIDC), ship SPDX SBOMs, and carry
+SLSA build provenance — see ["Verify a release"](README.md#verify-a-release)
+for the verification one-liners.
+
 ## Reporting a vulnerability
 
 Please **do not open a public issue** for security vulnerabilities.

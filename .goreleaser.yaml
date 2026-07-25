@@ -26,6 +26,24 @@ archives:
 checksum:
   name_template: checksums.txt
 
+# SPDX SBOM (via syft) for every archive, uploaded to the release.
+sboms:
+  - artifacts: archive
+
+# Keyless cosign signature (GitHub OIDC) over the checksums file: verifying
+# checksums.txt then transitively verifies every archive hash in it.
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - --yes
+      - --output-signature=${signature}
+      - --output-certificate=${certificate}
+      - ${artifact}
+    artifacts: checksum
+
 changelog:
   sort: asc
   filters:

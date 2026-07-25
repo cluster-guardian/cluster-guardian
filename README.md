@@ -109,6 +109,35 @@ helm install cluster-guardian ./charts/cluster-guardian \
 
 Key values: `prometheusUrl`, `ingress.*` (or `httpRoute.*` for Gateway API), `persistence.*`, `fleet.*`, `serviceMonitor.*`, `rbac.includeSecrets` (disable to run without cluster-wide Secret read access; the affected checks skip). See [values.yaml](charts/cluster-guardian/values.yaml) for the full list.
 
+### Verify a release
+
+Releases are signed with [cosign](https://github.com/sigstore/cosign) (keyless,
+GitHub OIDC), ship SPDX SBOMs, and carry SLSA build provenance. To verify:
+
+```sh
+# Image signature: proves the image was built by this repo's release workflow
+cosign verify ghcr.io/andrewkarpaty/cluster-guardian:v0.3.0 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp 'https://github.com/AndrewKarpaty/cluster-guardian/\.github/workflows/release\.yml@refs/tags/v.*'
+
+# Checksums signature, then verify a downloaded archive against it
+cosign verify-blob checksums.txt --signature checksums.txt.sig --certificate checksums.txt.pem \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp 'https://github.com/AndrewKarpaty/cluster-guardian/\.github/workflows/release\.yml@refs/tags/v.*'
+sha256sum --check --ignore-missing checksums.txt
+
+# SLSA provenance of an archive (multiple.intoto.jsonl from the release page)
+slsa-verifier verify-artifact cluster-guardian_*_linux_amd64.tar.gz \
+  --provenance-path multiple.intoto.jsonl \
+  --source-uri github.com/AndrewKarpaty/cluster-guardian
+
+# Image SBOM and provenance (BuildKit attestations on the manifest)
+docker buildx imagetools inspect ghcr.io/andrewkarpaty/cluster-guardian:v0.3.0 \
+  --format '{{ json .SBOM }}'
+```
+
+Per-archive SPDX SBOMs (`*.sbom.json`) are attached to every GitHub release.
+
 ## Usage
 
 Analyze the cluster from your current kubeconfig context:
