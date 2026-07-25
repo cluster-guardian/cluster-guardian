@@ -43,6 +43,7 @@ var SystemNamespaces = map[string]bool{
 type Snapshot struct {
 	ClusterVersion  string
 	Namespaces      []corev1.Namespace
+	Nodes           []corev1.Node // nil when listing nodes is not permitted
 	Pods            []corev1.Pod
 	Deployments     []appsv1.Deployment
 	StatefulSets    []appsv1.StatefulSet
@@ -116,6 +117,10 @@ func (c *Client) Collect(ctx context.Context, namespaces []string) (*Snapshot, e
 	}
 	s.Namespaces = filterNamespaces(nsList.Items, namespaces)
 
+	// Nodes are optional: without list permission the node checks skip.
+	if v, err := c.Clientset.CoreV1().Nodes().List(ctx, opts); err == nil {
+		s.Nodes = v.Items
+	}
 	if pods, err := c.Clientset.CoreV1().Pods(metav1.NamespaceAll).List(ctx, opts); err == nil {
 		s.Pods = pods.Items
 	} else {

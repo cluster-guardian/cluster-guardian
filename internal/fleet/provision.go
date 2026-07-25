@@ -20,7 +20,7 @@ import (
 var readOnlyRules = []rbacv1.PolicyRule{
 	{
 		APIGroups: []string{""},
-		Resources: []string{"namespaces", "pods", "services", "configmaps", "secrets", "persistentvolumeclaims", "serviceaccounts"},
+		Resources: []string{"namespaces", "nodes", "pods", "services", "configmaps", "secrets", "persistentvolumeclaims", "serviceaccounts"},
 		Verbs:     []string{"get", "list"},
 	},
 	{
