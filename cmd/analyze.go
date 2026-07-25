@@ -100,8 +100,12 @@ func finishReport(cmd *cobra.Command, r *report.Report) error {
 		err = report.WriteMarkdown(out, r)
 	case "html":
 		err = report.WriteHTML(out, r)
+	case "sarif":
+		err = report.WriteSARIF(out, r)
+	case "junit":
+		err = report.WriteJUnit(out, r)
 	default:
-		return fmt.Errorf("unknown output format %q (use terminal, json, markdown or html)", flagOutput)
+		return fmt.Errorf("unknown output format %q (use terminal, json, markdown, html, sarif or junit)", flagOutput)
 	}
 	if closer != nil {
 		if cerr := closer.Close(); cerr != nil && err == nil {
@@ -143,7 +147,7 @@ func checkFailThreshold(r *report.Report) error {
 func init() {
 	for _, cmd := range []*cobra.Command{analyzeCmd, rootCmd, lintCmd} {
 		f := cmd.Flags()
-		f.StringVarP(&flagOutput, "output", "o", "terminal", "output format: terminal, json, markdown, html")
+		f.StringVarP(&flagOutput, "output", "o", "terminal", "output format: terminal, json, markdown, html, sarif, junit")
 		f.StringVar(&flagOutputFile, "output-file", "", "write the report to a file instead of stdout")
 		f.StringVar(&flagFailOn, "fail-on", "none", "exit non-zero if findings reach this severity: none, warning, critical")
 		f.StringVar(&flagFramework, "framework", "", "only show findings mapped to a compliance framework: pss")

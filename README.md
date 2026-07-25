@@ -63,7 +63,7 @@ Cluster Guardian is an open-source tool that analyzes Kubernetes clusters and pr
 * Cluster health score (0–100) and A–F grades, with `--fail-below` gating
 * Fleet mode: hosted multi-cluster scorecard with declarative, Secret-based cluster registration
 * Static manifest linting (`lint`): the same rule set pre-deploy, no cluster needed
-* Export reports in JSON, Markdown, and HTML
+* Export reports in JSON, Markdown, HTML, SARIF (GitHub code scanning), and JUnit XML
 * REST API and Web Dashboard
 * CLI for automation and CI/CD integration
 
@@ -177,6 +177,17 @@ to objects that only exist in the live cluster surface as findings.
 cluster-guardian analyze -o json     --output-file report.json
 cluster-guardian analyze -o markdown --output-file report.md
 cluster-guardian analyze -o html     --output-file report.html
+cluster-guardian analyze -o sarif    --output-file results.sarif   # GitHub code scanning
+cluster-guardian analyze -o junit    --output-file report.xml      # GitLab / Jenkins test reports
+```
+
+SARIF findings carry count-normalized fingerprints, so re-runs deduplicate
+in code scanning; in JUnit output warnings and criticals render as failed
+tests while info findings stay visible as passing cases. Both formats also
+work with `lint`, so PR annotations cover manifests pre-deploy:
+
+```sh
+helm template ./chart | cluster-guardian lint - -o sarif --output-file results.sarif
 ```
 
 ### Cluster documentation (deprecated)

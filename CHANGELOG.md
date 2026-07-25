@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- SARIF and JUnit output formats (#12): `-o sarif` emits SARIF 2.1.0 for GitHub code scanning (severities mapped to error/warning/note, count-normalized fingerprints for deduplication, finding objects as location URIs) and `-o junit` emits JUnit XML (warnings/criticals as failures, info/OK as passing cases, hints as failure bodies). Both work in `analyze` and `lint`.
+
 - Static manifest analysis (#27): `cluster-guardian lint <file|dir|->` builds a snapshot from YAML/JSON manifests (multi-doc, kustomize/helm-template output via stdin, `List` expansion, kubectl-style namespace defaulting) and runs the cluster-agnostic checks — workloads, security, hygiene, certificates, and deprecated APIs (via the manifests' own apiVersions). One pod is synthesized per workload template so pod-level checks and selector matching work pre-deploy. Live-only checks are skipped automatically; output formats, `--framework`, and `--fail-on`/`--fail-below` gating are shared with `analyze`.
 
 - Policy section (#35): aggregates policy-engine state into the report — Kyverno PolicyReport failures summed per namespace, Gatekeeper constraint violations from audit status (constraint kinds discovered dynamically via the CRD list), info findings when an engine is installed with zero policies/constraints, and a coverage-gap warning for namespaces with pods that no admission policy covers. Silent when neither engine is installed. Chart role and `cluster add` provisioning grant the required reads.
