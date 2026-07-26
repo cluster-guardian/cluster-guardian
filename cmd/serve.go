@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -9,10 +10,12 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/AndrewKarpaty/cluster-guardian/internal/analyzer"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/deliver"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/fleet"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/history"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/notify"
+	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
 	"github.com/AndrewKarpaty/cluster-guardian/internal/server"
 )
 
@@ -35,6 +38,7 @@ var (
 	flagReportSMTPFrom string
 	flagReportWebhook  string
 	flagReportDir      string
+	flagFixture        []string
 )
 
 var serveCmd = &cobra.Command{
@@ -48,6 +52,9 @@ var serveCmd = &cobra.Command{
   GET /metrics             Prometheus metrics (findings, score, run stats)
   GET /healthz             liveness probe`,
 	RunE: func(_ *cobra.Command, _ []string) error {
+		if len(flagFixture) > 0 {
+			return serveFixture()
+		}
 		client, err := newKubeClient()
 		if err != nil {
 			return err
@@ -119,7 +126,35 @@ func init() {
 	serveCmd.Flags().StringVar(&flagReportSMTPFrom, "report-smtp-from", "", "From address for scheduled report emails")
 	serveCmd.Flags().StringVar(&flagReportWebhook, "report-webhook-url", "", "webhook POSTed the report JSON on schedule")
 	serveCmd.Flags().StringVar(&flagReportDir, "report-dir", "", "directory to write scheduled report files into")
+	serveCmd.Flags().StringSliceVar(&flagFixture, "fixture", nil, "serve canned report JSON files instead of analyzing a cluster (repeatable; for demos and UI tests)")
 	rootCmd.AddCommand(serveCmd)
+}
+
+// serveFixture serves canned report JSON files instead of analyzing a
+// cluster: no kubeconfig needed. Files are appended to history in order and
+// the last one becomes the current report — two or more files light up the
+// trend chart and run-over-run diff. Enabler for UI e2e tests and demos.
+func serveFixture() error {
+	hist, err := history.New("", flagHistoryLimit)
+	if err != nil {
+		return err
+	}
+	var last *report.Report
+	for _, path := range flagFixture {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		var r report.Report
+		if err := json.Unmarshal(data, &r); err != nil {
+			return fmt.Errorf("parsing fixture %s: %w", path, err)
+		}
+		hist.Append(&r)
+		last = &r
+	}
+	srv := server.New(nil, analyzer.Options{}, flagCacheTTL, hist)
+	srv.SetFixture(last)
+	return srv.ListenAndServe(flagListen)
 }
 
 // buildNotifier assembles the notification sink: the global --notify-url

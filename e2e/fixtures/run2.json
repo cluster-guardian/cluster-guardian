@@ -1,0 +1,174 @@
+{
+  "clusterName": "demo",
+  "generatedAt": "2026-07-26T07:17:42.176099Z",
+  "namespaces": [
+    {
+      "name": "payments",
+      "team": "payments-team",
+      "findings": [
+        {
+          "severity": "warning",
+          "message": "1 Pod missing resource requests",
+          "hint": "Set spec.containers[].resources.requests for CPU and memory so the scheduler can place pods reliably."
+        },
+        {
+          "severity": "info",
+          "message": "1 Pod missing memory limits",
+          "hint": "Memory limits protect nodes from a single pod consuming all memory."
+        },
+        {
+          "severity": "warning",
+          "message": "1 container without readiness or startup probes",
+          "hint": "Without readiness probes, traffic is routed to pods before they can serve it."
+        },
+        {
+          "severity": "info",
+          "message": "1 container without liveness probes"
+        },
+        {
+          "severity": "info",
+          "message": "Missing HorizontalPodAutoscaler",
+          "hint": "HPAs absorb load spikes without manual scaling."
+        },
+        {
+          "severity": "warning",
+          "message": "1 multi-replica workload without a PodDisruptionBudget (api)",
+          "hint": "Without a PDB, a node drain may evict every replica at once and cause downtime during maintenance."
+        },
+        {
+          "severity": "info",
+          "message": "1 multi-replica workload without topologySpreadConstraints or pod anti-affinity (api)",
+          "hint": "Replicas may be scheduled onto the same node or zone, so one failure can take all of them down."
+        }
+      ]
+    },
+    {
+      "name": "shop",
+      "team": "shop-team",
+      "findings": [
+        {
+          "severity": "warning",
+          "message": "2 Pods missing resource requests",
+          "hint": "Set spec.containers[].resources.requests for CPU and memory so the scheduler can place pods reliably."
+        },
+        {
+          "severity": "info",
+          "message": "2 Pods missing memory limits",
+          "hint": "Memory limits protect nodes from a single pod consuming all memory."
+        },
+        {
+          "severity": "warning",
+          "message": "Deployment \"web\" uses :latest tag",
+          "object": "deployment/web",
+          "hint": "Pin images to an immutable tag or digest for reproducible deploys and clean rollbacks."
+        },
+        {
+          "severity": "warning",
+          "message": "Deployment \"web\" uses :latest tag",
+          "object": "deployment/web",
+          "hint": "Pin images to an immutable tag or digest for reproducible deploys and clean rollbacks."
+        },
+        {
+          "severity": "warning",
+          "message": "2 containers without readiness or startup probes",
+          "hint": "Without readiness probes, traffic is routed to pods before they can serve it."
+        },
+        {
+          "severity": "info",
+          "message": "2 containers without liveness probes"
+        },
+        {
+          "severity": "info",
+          "message": "2 single-replica Deployments (web, web)",
+          "hint": "Single replicas mean downtime on every rollout, eviction or node failure."
+        },
+        {
+          "severity": "info",
+          "message": "Missing HorizontalPodAutoscaler for web, web",
+          "hint": "HPAs absorb load spikes without manual scaling."
+        }
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "id": "security",
+      "title": "Security",
+      "icon": "🔒",
+      "findings": [
+        {
+          "severity": "warning",
+          "message": "2 containers running as root",
+          "hint": "Set securityContext.runAsNonRoot: true and a non-zero runAsUser.",
+          "controls": [
+            "PSS/restricted:run-as-nonroot"
+          ]
+        },
+        {
+          "severity": "critical",
+          "message": "2 privileged containers",
+          "hint": "Privileged containers have full access to the host. Replace with specific capabilities.",
+          "controls": [
+            "PSS/baseline:privileged"
+          ]
+        },
+        {
+          "severity": "warning",
+          "message": "2 namespaces without NetworkPolicies (payments, shop)",
+          "hint": "Without NetworkPolicies every pod can talk to every other pod."
+        },
+        {
+          "severity": "warning",
+          "message": "3 Pods without a seccomp profile",
+          "hint": "Set securityContext.seccompProfile.type: RuntimeDefault to filter dangerous syscalls.",
+          "controls": [
+            "PSS/restricted:seccomp"
+          ]
+        },
+        {
+          "severity": "info",
+          "message": "3 containers without readOnlyRootFilesystem",
+          "hint": "A writable root filesystem lets a compromised process modify its own image at runtime."
+        },
+        {
+          "severity": "info",
+          "message": "3 Pods automounting ServiceAccount tokens",
+          "hint": "Set automountServiceAccountToken: false on pods (or their ServiceAccount) that don't call the Kubernetes API."
+        },
+        {
+          "severity": "info",
+          "message": "Pod Security Standards: 2 of 5 observable controls passing (failing: Privileged Containers, Running as Non-root, Seccomp Profile)",
+          "hint": "See https://kubernetes.io/docs/concepts/security/pod-security-standards/ for the control definitions.",
+          "controls": [
+            "PSS/baseline:privileged",
+            "PSS/baseline:host-namespaces",
+            "PSS/baseline:capabilities",
+            "PSS/restricted:run-as-nonroot",
+            "PSS/restricted:seccomp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "certificates",
+      "title": "Certificates",
+      "icon": "🔐",
+      "findings": null
+    },
+    {
+      "id": "deprecations",
+      "title": "Deprecated APIs",
+      "icon": "⏳",
+      "findings": null
+    }
+  ],
+  "summary": {
+    "namespaces": 2,
+    "totalFindings": 22,
+    "info": 11,
+    "warnings": 10,
+    "critical": 1,
+    "score": 34,
+    "grade": "F"
+  }
+}

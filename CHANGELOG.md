@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Fixture serve mode and UI e2e tests (#59): `serve --fixture report.json` (repeatable — multiple files build history for trends and diffs) serves canned reports without a cluster, and a Playwright suite drives the dashboard (filters, search, team/namespace dropdowns, trend chart, API links) against it in CI.
+
+### Changed
+
+- Dashboard and fleet UI extracted from inline Go template strings into embedded assets (#53): templates as `.gohtml` files, CSS/JS as static files served under `/static/` in serve mode — the groundwork CSP hardening (#57) requires. The `-o html` file export inlines the same bytes and stays fully self-contained; no frontend build step was added (an embedded SPA remains an option for the findings explorer, #54).
+
 - Team ownership routing (#34): namespaces map to teams via a `team` namespace label (`--team-label`) and/or a `--teams-file` YAML mapping (terse list or structured form with per-team webhooks). Namespace sections gain a `team` JSON field, `--team` filters reports to one team's namespaces (analyze and lint), the dashboard gains a team filter, and new-finding notifications route per team — each team's webhook only receives findings from its own namespaces. Helm wiring via `teams`/`teamLabel` values.
 
 - Scheduled report delivery and PDF export (#51): `-o pdf` renders any report (analyze, `report` alias, lint) as a pure-Go PDF — offline, no headless browser. `serve --report-schedule` (cron) delivers on schedule to SMTP email (digest HTML body + attachment; credentials via `SMTP_USERNAME`/`SMTP_PASSWORD`), a webhook (report/digest JSON), and/or a directory. Fleet mode sends a digest with per-cluster grades, score deltas since the previous scan, and new-critical counts; single-cluster mode attaches the full report. Delivery counts and failures are exposed on `/metrics`. Helm wiring under `reports.*`.

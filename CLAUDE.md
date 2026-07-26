@@ -13,7 +13,10 @@ make build                           # build the binary (or: go build -o cluster
 make test                            # go test -race ./...
 make lint                            # golangci-lint run (config: .golangci.yml)
 go test ./internal/checks/ -run TestSecurity -v   # run a single test
+go build -o cluster-guardian . && cd e2e && npx playwright test   # UI e2e (needs `npm install` in e2e/ once)
 ```
+
+The dashboard/fleet UI lives as embedded assets (`internal/report/assets/`, `internal/server/assets/`) — templates in `.gohtml`, CSS/JS served under `/static/` in serve mode and inlined into the self-contained `-o html` export. `serve --fixture <report.json>` (repeatable) serves canned reports without a cluster — the base for UI e2e tests and demos (fixtures in `e2e/fixtures/`).
 
 CI (`.github/workflows/ci.yml`) runs build, vet, `test -race`, and golangci-lint on every PR. Pushing a `v*` tag triggers `release.yml`: GoReleaser builds binaries (version injected into `cmd.Version` via ldflags) and a multi-arch Docker image is pushed to `ghcr.io/andrewkarpaty/cluster-guardian`.
 

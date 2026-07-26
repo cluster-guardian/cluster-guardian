@@ -27,6 +27,7 @@ type Server struct {
 	history  *history.Store
 	fleet    *fleet.Manager
 	notifier notify.Sink
+	fixture  *report.Report
 
 	mu              sync.Mutex
 	cached          *report.Report
@@ -51,6 +52,10 @@ func (s *Server) EnableFleet(m *fleet.Manager) { s.fleet = m }
 // EnableNotifications posts new findings to n after each fresh analysis.
 func (s *Server) EnableNotifications(n notify.Sink) { s.notifier = n }
 
+// SetFixture makes the server serve a canned report instead of analyzing a
+// cluster — the enabler for UI end-to-end tests and demos.
+func (s *Server) SetFixture(r *report.Report) { s.fixture = r }
+
 // Handler returns the HTTP routes for the dashboard, REST API and health probe.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -58,6 +63,7 @@ func (s *Server) Handler() http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(report.StaticAssets)))
 	mux.HandleFunc("GET /metrics", s.handleMetrics)
 	mux.HandleFunc("GET /api/report", s.handleReport(report.WriteJSON, "application/json"))
 	mux.HandleFunc("GET /api/report/markdown", s.handleReport(report.WriteMarkdown, "text/markdown; charset=utf-8"))
@@ -105,6 +111,9 @@ func (s *Server) handleReport(render func(w io.Writer, r *report.Report) error, 
 func (s *Server) report(ctx context.Context, forceRefresh bool) (*report.Report, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.fixture != nil {
+		return s.fixture, nil
+	}
 	if !forceRefresh && s.cached != nil && time.Since(s.cachedAt) < s.ttl {
 		return s.cached, nil
 	}

@@ -37,13 +37,20 @@ func (s *Server) handleMetrics(w http.ResponseWriter, _ *http.Request) {
 		}
 	} else {
 		s.mu.Lock()
-		name := s.client.Context
-		if s.cached != nil && s.cached.ClusterName != "" {
-			name = s.cached.ClusterName
+		var name string
+		if s.client != nil {
+			name = s.client.Context
+		}
+		current := s.cached
+		if current == nil {
+			current = s.fixture
+		}
+		if current != nil && current.ClusterName != "" {
+			name = current.ClusterName
 		}
 		clusters = []clusterMetrics{{
 			Name:         name,
-			Report:       s.cached,
+			Report:       current,
 			LastRun:      s.cachedAt,
 			LastDuration: s.lastRunDuration,
 			Runs:         s.runs,

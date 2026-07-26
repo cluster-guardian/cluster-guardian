@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="60">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%232563EB' d='M12 1l9 3.4v7.4c0 5-3.6 8.7-9 10.7-5.4-2-9-5.7-9-10.7V4.4z'/%3E%3C/svg%3E">
+<title>Cluster Guardian — Fleet</title>
+<link rel="stylesheet" href="/static/fleet.css">
+</head>
+<body>
+<main>
+  <h1><svg class="logo" viewBox="0 0 512 512" fill="none" aria-hidden="true"><defs><linearGradient id="lg" x1="68" y1="40" x2="444" y2="472" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2563EB"/><stop offset="1" stop-color="#0EA5E9"/></linearGradient></defs><path d="M256 40 L444 110 V268 C444 375 366 442 256 472 C146 442 68 375 68 268 V110 Z" fill="url(#lg)"/><g stroke="#FFF" stroke-opacity=".85" stroke-width="14" stroke-linecap="round"><path d="M256 250 L256 150"/><path d="M256 250 L170 316"/><path d="M256 250 L342 316"/></g><g fill="#FFF" fill-opacity=".95"><circle cx="256" cy="142" r="24"/><circle cx="164" cy="322" r="24"/><circle cx="348" cy="322" r="24"/></g><circle cx="256" cy="250" r="42" fill="#FFF"/><path d="M238 251 L252 265 L278 235" stroke="url(#lg)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg> Cluster Guardian — Fleet</h1>
+  <div class="grid">
+    {{range .}}
+    <a class="card" href="/clusters/{{.Name}}">
+      <h2>{{.Name}}</h2>
+      <p class="meta">{{.Server}}</p>
+      {{if .Summary}}
+      <div class="row">
+        <span class="grade g{{.Summary.Grade}}">{{.Summary.Grade}}</span>
+        <span class="meta">{{.Summary.Score}}/100</span>
+        <span class="counts">{{.Summary.Critical}} critical<br>{{.Summary.Warnings}} warnings</span>
+      </div>
+      {{end}}
+      {{if .Error}}<p class="err">⚠ {{.Error}}</p>{{end}}
+      {{if not .LastScan.IsZero}}<p class="meta">scanned {{.LastScan.Format "15:04:05 UTC"}}</p>{{end}}
+    </a>
+    {{end}}
+  </div>
+</main>
+</body>
+</html>
