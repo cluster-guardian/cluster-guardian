@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/andrewkarpaty/cluster-guardian
+  repository: ghcr.io/cluster-guardian/cluster-guardian
   # Defaults to "v<appVersion>" of the chart.
   tag: ""
   pullPolicy: IfNotPresent
@@ -57,7 +57,7 @@ service:
   type: ClusterIP
   port: 80
 
-# Team ownership: map teams to namespaces to make reports, the dashboard and
+# Team ownership: map teams to namespaces to make reports, the API and
 # notifications team-aware. Rendered into a ConfigMap and passed via
 # --teams-file. Namespaces can also carry a label (--team-label, default
 # "team") instead. Example:

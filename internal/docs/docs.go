@@ -11,7 +11,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/kube"
+	"github.com/cluster-guardian/cluster-guardian/internal/kube"
 )
 
 // Write renders cluster documentation for the given namespaces.

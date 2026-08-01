@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
 )
 
 // maxListed caps the findings spelled out in a Slack message.

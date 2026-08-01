@@ -8,8 +8,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/kube"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/kube"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
 )
 
 // nsRefs holds the names of resources referenced by anything in a namespace.

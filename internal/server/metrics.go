@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
 )
 
 // clusterMetrics is one cluster's contribution to /metrics.

@@ -4,9 +4,9 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/analyzer"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/kube"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/teams"
+	"github.com/cluster-guardian/cluster-guardian/internal/analyzer"
+	"github.com/cluster-guardian/cluster-guardian/internal/kube"
+	"github.com/cluster-guardian/cluster-guardian/internal/teams"
 )
 
 var (

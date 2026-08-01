@@ -7,8 +7,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/kube"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/kube"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
 )
 
 // statefulComponents maps image substrings to display names for the

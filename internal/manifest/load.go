@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/kube"
+	"github.com/cluster-guardian/cluster-guardian/internal/kube"
 )
 
 const gatewayAPIGroup = "gateway.networking.k8s.io/"

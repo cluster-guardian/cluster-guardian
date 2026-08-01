@@ -14,7 +14,7 @@ for the verification one-liners.
 
 Please **do not open a public issue** for security vulnerabilities.
 
-Instead, report it privately via [GitHub private vulnerability reporting](https://github.com/AndrewKarpaty/cluster-guardian/security/advisories/new) ("Report a vulnerability" in the Security tab).
+Instead, report it privately via [GitHub private vulnerability reporting](https://github.com/cluster-guardian/cluster-guardian/security/advisories/new) ("Report a vulnerability" in the Security tab).
 
 Include what you can:
 

@@ -7,8 +7,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/kube"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/kube"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
 )
 
 func policyReport(ns, name string, fails int64) unstructured.Unstructured {

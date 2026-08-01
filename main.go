@@ -5,7 +5,7 @@ package main
 import (
 	"os"
 
-	"github.com/AndrewKarpaty/cluster-guardian/cmd"
+	"github.com/cluster-guardian/cluster-guardian/cmd"
 )
 
 func main() {

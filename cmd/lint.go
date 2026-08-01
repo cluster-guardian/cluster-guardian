@@ -3,8 +3,8 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/analyzer"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/manifest"
+	"github.com/cluster-guardian/cluster-guardian/internal/analyzer"
+	"github.com/cluster-guardian/cluster-guardian/internal/manifest"
 )
 
 var lintCmd = &cobra.Command{

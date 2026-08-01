@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
 )
 
 // Sink receives the new findings after a run. Both Notifier and Router

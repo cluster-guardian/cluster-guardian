@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/fleet"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/kube"
+	"github.com/cluster-guardian/cluster-guardian/internal/fleet"
+	"github.com/cluster-guardian/cluster-guardian/internal/kube"
 )
 
 var (

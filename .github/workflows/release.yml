@@ -73,9 +73,9 @@ jobs:
           build-args: |
             VERSION=${{ github.ref_name }}
           tags: |
-            ghcr.io/andrewkarpaty/cluster-guardian:${{ github.ref_name }}
-            ghcr.io/andrewkarpaty/cluster-guardian:latest
+            ghcr.io/cluster-guardian/cluster-guardian:${{ github.ref_name }}
+            ghcr.io/cluster-guardian/cluster-guardian:latest
       # Keyless signature over the pushed digest; a failure here fails the
       # release — no silent unsigned images.
       - name: Sign image
-        run: cosign sign --yes ghcr.io/andrewkarpaty/cluster-guardian@${{ steps.build.outputs.digest }}
+        run: cosign sign --yes ghcr.io/cluster-guardian/cluster-guardian@${{ steps.build.outputs.digest }}

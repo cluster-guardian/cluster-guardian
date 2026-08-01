@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
 )
 
 // Entry is one run in the history index.

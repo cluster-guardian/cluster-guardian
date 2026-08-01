@@ -15,7 +15,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X github.com/AndrewKarpaty/cluster-guardian/cmd.Version={{ .Version }}
+      - -s -w -X github.com/cluster-guardian/cluster-guardian/cmd.Version={{ .Version }}
 
 archives:
   - formats: [tar.gz]

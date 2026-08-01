@@ -13,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/kube"
+	"github.com/cluster-guardian/cluster-guardian/internal/kube"
 )
 
 // SecretLabel marks Secrets that register a cluster with the fleet. A

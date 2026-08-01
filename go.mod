@@ -1,4 +1,4 @@
-module github.com/AndrewKarpaty/cluster-guardian
+module github.com/cluster-guardian/cluster-guardian
 
 go 1.26.0
 

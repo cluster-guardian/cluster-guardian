@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/analyzer"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/history"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/notify"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/analyzer"
+	"github.com/cluster-guardian/cluster-guardian/internal/history"
+	"github.com/cluster-guardian/cluster-guardian/internal/notify"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
 )
 
 // Status is what the fleet API exposes per cluster — never credentials.

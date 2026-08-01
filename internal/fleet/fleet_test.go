@@ -15,10 +15,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/analyzer"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/kube"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/notify"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/analyzer"
+	"github.com/cluster-guardian/cluster-guardian/internal/kube"
+	"github.com/cluster-guardian/cluster-guardian/internal/notify"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
 )
 
 func clusterSecret(name, label string) *corev1.Secret {
