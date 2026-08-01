@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cluster-guardian/cluster-guardian/internal/analyzer"
+	"github.com/cluster-guardian/cluster-guardian/internal/auth"
 	"github.com/cluster-guardian/cluster-guardian/internal/fleet"
 	"github.com/cluster-guardian/cluster-guardian/internal/history"
 	"github.com/cluster-guardian/cluster-guardian/internal/kube"
@@ -29,6 +30,8 @@ type Server struct {
 	fleet    *fleet.Manager
 	notifier notify.Sink
 	fixture  *report.Report
+	auth     auth.Config
+	admin    *Admin
 
 	mu              sync.Mutex
 	cached          *report.Report
@@ -42,7 +45,12 @@ type Server struct {
 // New returns a Server that analyzes via client, caches reports for cacheTTL,
 // and records each fresh analysis in hist (may be nil to disable history).
 func New(client *kube.Client, opts analyzer.Options, cacheTTL time.Duration, hist *history.Store) *Server {
-	return &Server{client: client, opts: opts, ttl: cacheTTL, history: hist}
+	return &Server{
+		client: client, opts: opts, ttl: cacheTTL, history: hist,
+		// Auth off, reads open: the behaviour before roles existed. A caller
+		// that wants anything else calls EnableAuth.
+		auth: auth.Config{AnonymousRole: auth.RoleViewer}.WithDefaults(),
+	}
 }
 
 // EnableFleet switches the server into fleet mode: per-cluster routes under
@@ -57,29 +65,59 @@ func (s *Server) EnableNotifications(n notify.Sink) { s.notifier = n }
 // tests against the API, and how demos run without a cluster.
 func (s *Server) SetFixture(r *report.Report) { s.fixture = r }
 
+// EnableAuth resolves each request's identity from proxy headers. Without it
+// every request is anonymous and gets the role New installed, which is viewer.
+func (s *Server) EnableAuth(c auth.Config) { s.auth = c.WithDefaults() }
+
 // Handler returns the HTTP routes for the REST API, metrics and health probe.
 // The web UI is a separate product (cluster-guardian-ui) and consumes these
 // endpoints; this server renders no HTML.
 func (s *Server) Handler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+	// Unauthenticated: a kubelet probe and a Prometheus scrape do not carry
+	// identity headers, and neither exposes findings. Everything under /api
+	// goes through the middleware.
+	root := http.NewServeMux()
+	root.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
-	mux.HandleFunc("GET /{$}", s.handleIndex)
-	mux.HandleFunc("GET /metrics", s.handleMetrics)
-	mux.HandleFunc("GET /api/report", s.handleReport(report.WriteJSON, "application/json"))
-	mux.HandleFunc("GET /api/report/markdown", s.handleReport(report.WriteMarkdown, "text/markdown; charset=utf-8"))
-	mux.HandleFunc("GET /api/history", s.handleHistory)
-	mux.HandleFunc("GET /api/history/diff", s.handleHistoryDiff)
+	root.HandleFunc("GET /metrics", s.handleMetrics)
+	root.HandleFunc("GET /{$}", s.handleIndex)
+
+	api := http.NewServeMux()
+	// /api/me carries no findings and is deliberately ungated: a caller with
+	// no permissions still needs to be told so, and the UI renders "you have
+	// no access" from this rather than from a bare 403 on some other route.
+	api.HandleFunc("GET /api/me", s.handleMe)
+	api.HandleFunc("GET /api/report", auth.Require(auth.PermReadReports, s.handleReport(report.WriteJSON, "application/json")))
+	api.HandleFunc("GET /api/report/markdown", auth.Require(auth.PermReadReports, s.handleReport(report.WriteMarkdown, "text/markdown; charset=utf-8")))
+	api.HandleFunc("GET /api/history", auth.Require(auth.PermReadReports, s.handleHistory))
+	api.HandleFunc("GET /api/history/diff", auth.Require(auth.PermReadReports, s.handleHistoryDiff))
 	if s.fleet != nil {
-		mux.HandleFunc("GET /api/clusters", s.handleClusters)
-		mux.HandleFunc("GET /api/clusters/{name}/report", s.handleClusterReport(report.WriteJSON, "application/json"))
-		mux.HandleFunc("GET /api/clusters/{name}/report/markdown", s.handleClusterReport(report.WriteMarkdown, "text/markdown; charset=utf-8"))
-		mux.HandleFunc("GET /api/clusters/{name}/history", s.handleClusterHistory)
-		mux.HandleFunc("GET /api/clusters/{name}/history/diff", s.handleClusterHistoryDiff)
+		api.HandleFunc("GET /api/clusters", auth.Require(auth.PermReadReports, s.handleClusters))
+		api.HandleFunc("GET /api/clusters/{name}/report", auth.Require(auth.PermReadReports, s.handleClusterReport(report.WriteJSON, "application/json")))
+		api.HandleFunc("GET /api/clusters/{name}/report/markdown", auth.Require(auth.PermReadReports, s.handleClusterReport(report.WriteMarkdown, "text/markdown; charset=utf-8")))
+		api.HandleFunc("GET /api/clusters/{name}/history", auth.Require(auth.PermReadReports, s.handleClusterHistory))
+		api.HandleFunc("GET /api/clusters/{name}/history/diff", auth.Require(auth.PermReadReports, s.handleClusterHistoryDiff))
 	}
-	return mux
+	// The write routes exist only when the server has a cluster connection to
+	// write through. Leaving them unregistered means a deployment without the
+	// write API answers 405 on POST /api/clusters (the path exists for GET)
+	// rather than 403 — "this server does not do that" instead of "you may
+	// not", which is the truthful distinction.
+	if s.admin != nil {
+		if s.fleet != nil {
+			api.HandleFunc("POST /api/clusters", auth.Require(auth.PermManageClusters, s.handleCreateCluster))
+			api.HandleFunc("DELETE /api/clusters/{name}", auth.Require(auth.PermManageClusters, s.handleDeleteCluster))
+		}
+		if s.admin.Teams != nil {
+			api.HandleFunc("GET /api/teams", auth.Require(auth.PermReadReports, s.handleGetTeams))
+			api.HandleFunc("PUT /api/teams", auth.Require(auth.PermManageTeams, s.handlePutTeams))
+		}
+	}
+	root.Handle("/api/", s.auth.Middleware(api))
+
+	return root
 }
 
 // handleIndex lists the available endpoints so hitting the root of the server
@@ -88,6 +126,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, _ *http.Request) {
 	endpoints := []string{
 		"GET /healthz",
 		"GET /metrics",
+		"GET /api/me",
 		"GET /api/report",
 		"GET /api/report/markdown",
 		"GET /api/history",
@@ -104,9 +143,18 @@ func (s *Server) handleIndex(w http.ResponseWriter, _ *http.Request) {
 			"GET /api/clusters/{name}/history/diff",
 		)
 	}
+	if s.admin != nil {
+		if s.fleet != nil {
+			endpoints = append(endpoints, "POST /api/clusters", "DELETE /api/clusters/{name}")
+		}
+		if s.admin.Teams != nil {
+			endpoints = append(endpoints, "GET /api/teams", "PUT /api/teams")
+		}
+	}
 	writeJSON(w, map[string]any{
 		"name":      "cluster-guardian",
 		"mode":      mode,
+		"auth":      map[string]any{"enabled": s.auth.Enabled, "anonymousRole": s.auth.AnonymousRole},
 		"endpoints": endpoints,
 	})
 }

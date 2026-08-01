@@ -84,6 +84,14 @@ func NewManager(lister ClusterLister, opts analyzer.Options, interval time.Durat
 // EnableNotifications posts each cluster's new findings to n after scans.
 func (m *Manager) EnableNotifications(n notify.Sink) { m.notifier = n }
 
+// SetTeamOf replaces the namespace-to-team mapping used by subsequent scans,
+// so an ownership change made through the API takes effect without a restart.
+func (m *Manager) SetTeamOf(mapping map[string]string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.opts.TeamOf = mapping
+}
+
 // SetScanForTest replaces the per-cluster scan function so tests can inject
 // synthetic reports.
 func (m *Manager) SetScanForTest(scan func(context.Context, Cluster) (*report.Report, error)) {
@@ -116,6 +124,18 @@ func (m *Manager) ScanAll(ctx context.Context) {
 
 	m.mu.Lock()
 	m.order = m.order[:0]
+	// Drop clusters that are no longer registered. Without this, deleting a
+	// registration would leave its last report readable at
+	// /api/clusters/{name}/report even though it has left the fleet.
+	live := make(map[string]bool, len(clusters))
+	for _, c := range clusters {
+		live[c.Name] = true
+	}
+	for name := range m.states {
+		if !live[name] {
+			delete(m.states, name)
+		}
+	}
 	for _, c := range clusters {
 		m.order = append(m.order, c.Name)
 		if _, ok := m.states[c.Name]; !ok {
