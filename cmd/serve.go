@@ -10,13 +10,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/analyzer"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/deliver"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/fleet"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/history"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/notify"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/server"
+	"github.com/cluster-guardian/cluster-guardian/internal/analyzer"
+	"github.com/cluster-guardian/cluster-guardian/internal/deliver"
+	"github.com/cluster-guardian/cluster-guardian/internal/fleet"
+	"github.com/cluster-guardian/cluster-guardian/internal/history"
+	"github.com/cluster-guardian/cluster-guardian/internal/notify"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/server"
 )
 
 var (
@@ -43,14 +43,22 @@ var (
 
 var serveCmd = &cobra.Command{
 	Use:   "serve",
-	Short: "Serve the REST API and web dashboard",
+	Short: "Serve the REST API",
 	Long: `Starts an HTTP server exposing:
 
-  GET /                    web dashboard (HTML report)
+  GET /                    index of available endpoints
   GET /api/report          report as JSON (append ?refresh=true to bypass cache)
   GET /api/report/markdown report as Markdown
+  GET /api/history         past runs (summaries)
+  GET /api/history/diff    what changed since the previous run
   GET /metrics             Prometheus metrics (findings, score, run stats)
-  GET /healthz             liveness probe`,
+  GET /healthz             liveness probe
+
+With --fleet, per-cluster equivalents are served under /api/clusters.
+
+The web UI is a separate application (cluster-guardian-ui) that consumes this
+API; this server renders no HTML. For a report you can open in a browser
+without a server, use "analyze -o html".`,
 	RunE: func(_ *cobra.Command, _ []string) error {
 		if len(flagFixture) > 0 {
 			return serveFixture()

@@ -146,28 +146,32 @@ func TestDiff(t *testing.T) {
 	}
 }
 
-func TestWriteDashboard(t *testing.T) {
-	var file, dash bytes.Buffer
-	if err := WriteHTML(&file, sampleReport()); err != nil {
+// The HTML export has to work from disk with no server and no network: it
+// carries its own styles and script and never references an external asset or
+// the REST API.
+func TestWriteHTMLIsSelfContained(t *testing.T) {
+	var buf bytes.Buffer
+	if err := WriteHTML(&buf, sampleReport()); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteDashboard(&dash, sampleReport()); err != nil {
-		t.Fatal(err)
-	}
+	out := buf.String()
 
-	// Client-side filtering ships in both variants.
 	for _, want := range []string{`id="search"`, `id="nsfilter"`, `data-sev="critical"`, `<details class="card" open`} {
-		if !strings.Contains(file.String(), want) || !strings.Contains(dash.String(), want) {
-			t.Errorf("expected %q in both HTML variants", want)
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in the HTML export", want)
 		}
 	}
-	// Live controls need the REST API and are dashboard-only.
-	for _, live := range []string{`id="autorefresh"`, `href="/api/report"`, `href="/api/report/markdown"`} {
-		if !strings.Contains(dash.String(), live) {
-			t.Errorf("expected %q in dashboard output", live)
+	// Styles and script are inlined, not linked.
+	for _, want := range []string{"<style>", "<script>"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in the HTML export", want)
 		}
-		if strings.Contains(file.String(), live) {
-			t.Errorf("%q must not appear in file-export HTML", live)
+	}
+	// Resource loads only — an xmlns namespace URI is an identifier, not a fetch.
+	for _, external := range []string{`/static/`, `href="/api/`, `data-api=`, `fetch(`,
+		`src="http`, `href="http`, `url(http`} {
+		if strings.Contains(out, external) {
+			t.Errorf("%q must not appear in the HTML export — it must work offline", external)
 		}
 	}
 }

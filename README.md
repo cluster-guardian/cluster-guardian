@@ -9,12 +9,12 @@
 [![Release][release-badge]][release-url]
 [![License: MIT][license-badge]][license-url]
 
-[actions-badge]: https://github.com/AndrewKarpaty/cluster-guardian/actions/workflows/ci.yml/badge.svg
-[actions-url]: https://github.com/AndrewKarpaty/cluster-guardian/actions/workflows/ci.yml
-[godoc-badge]: https://pkg.go.dev/badge/github.com/AndrewKarpaty/cluster-guardian.svg
-[godoc-url]: https://pkg.go.dev/github.com/AndrewKarpaty/cluster-guardian
-[release-badge]: https://img.shields.io/github/v/release/AndrewKarpaty/cluster-guardian?include_prereleases
-[release-url]: https://github.com/AndrewKarpaty/cluster-guardian/releases
+[actions-badge]: https://github.com/cluster-guardian/cluster-guardian/actions/workflows/ci.yml/badge.svg
+[actions-url]: https://github.com/cluster-guardian/cluster-guardian/actions/workflows/ci.yml
+[godoc-badge]: https://pkg.go.dev/badge/github.com/cluster-guardian/cluster-guardian.svg
+[godoc-url]: https://pkg.go.dev/github.com/cluster-guardian/cluster-guardian
+[release-badge]: https://img.shields.io/github/v/release/cluster-guardian/cluster-guardian?include_prereleases
+[release-url]: https://github.com/cluster-guardian/cluster-guardian/releases
 [license-badge]: https://img.shields.io/badge/License-MIT-blue.svg
 [license-url]: LICENSE
 
@@ -64,19 +64,19 @@ Cluster Guardian is an open-source tool that analyzes Kubernetes clusters and pr
 * Fleet mode: hosted multi-cluster scorecard with declarative, Secret-based cluster registration
 * Static manifest linting (`lint`): the same rule set pre-deploy, no cluster needed
 * Export reports in JSON, Markdown, HTML, SARIF (GitHub code scanning), and JUnit XML
-* REST API and Web Dashboard
+* REST API consumed by the separate [web UI](https://github.com/cluster-guardian/cluster-guardian-ui)
 * CLI for automation and CI/CD integration
 
 ## Installation
 
 ```sh
-go install github.com/AndrewKarpaty/cluster-guardian@latest
+go install github.com/cluster-guardian/cluster-guardian@latest
 ```
 
 Or build from source:
 
 ```sh
-git clone https://github.com/AndrewKarpaty/cluster-guardian.git
+git clone https://github.com/cluster-guardian/cluster-guardian.git
 cd cluster-guardian
 go build -o cluster-guardian .
 ```
@@ -89,12 +89,12 @@ docker build -t cluster-guardian .
 # CLI: analyze using your local kubeconfig
 docker run --rm -v ~/.kube:/kube:ro -e KUBECONFIG=/kube/config cluster-guardian
 
-# Dashboard: bind to 0.0.0.0 so the published port is reachable
+# API server: bind to 0.0.0.0 so the published port is reachable
 docker run --rm -p 8080:8080 -v ~/.kube:/kube:ro -e KUBECONFIG=/kube/config \
   cluster-guardian serve --listen 0.0.0.0:8080
 ```
 
-When running in-cluster (e.g. as a Deployment for the dashboard), no kubeconfig is needed — the ServiceAccount token is picked up automatically.
+When running in-cluster (e.g. as a Deployment serving the API), no kubeconfig is needed — the ServiceAccount token is picked up automatically.
 
 ### Helm
 
@@ -116,23 +116,23 @@ GitHub OIDC), ship SPDX SBOMs, and carry SLSA build provenance. To verify:
 
 ```sh
 # Image signature: proves the image was built by this repo's release workflow
-cosign verify ghcr.io/andrewkarpaty/cluster-guardian:v0.3.0 \
+cosign verify ghcr.io/cluster-guardian/cluster-guardian:v0.3.0 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp 'https://github.com/AndrewKarpaty/cluster-guardian/\.github/workflows/release\.yml@refs/tags/v.*'
+  --certificate-identity-regexp 'https://github.com/cluster-guardian/cluster-guardian/\.github/workflows/release\.yml@refs/tags/v.*'
 
 # Checksums signature, then verify a downloaded archive against it
 cosign verify-blob checksums.txt --signature checksums.txt.sig --certificate checksums.txt.pem \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp 'https://github.com/AndrewKarpaty/cluster-guardian/\.github/workflows/release\.yml@refs/tags/v.*'
+  --certificate-identity-regexp 'https://github.com/cluster-guardian/cluster-guardian/\.github/workflows/release\.yml@refs/tags/v.*'
 sha256sum --check --ignore-missing checksums.txt
 
 # SLSA provenance of an archive (multiple.intoto.jsonl from the release page)
 slsa-verifier verify-artifact cluster-guardian_*_linux_amd64.tar.gz \
   --provenance-path multiple.intoto.jsonl \
-  --source-uri github.com/AndrewKarpaty/cluster-guardian
+  --source-uri github.com/cluster-guardian/cluster-guardian
 
 # Image SBOM and provenance (BuildKit attestations on the manifest)
-docker buildx imagetools inspect ghcr.io/andrewkarpaty/cluster-guardian:v0.3.0 \
+docker buildx imagetools inspect ghcr.io/cluster-guardian/cluster-guardian:v0.3.0 \
   --format '{{ json .SBOM }}'
 ```
 
@@ -224,33 +224,45 @@ helm template ./chart | cluster-guardian lint - -o sarif --output-file results.s
 The `docs` command (Markdown documentation of workloads, services, and
 ingresses) is deprecated and will be removed in the release after next —
 cluster documentation is out of scope for an analyzer. See
-[#52](https://github.com/AndrewKarpaty/cluster-guardian/issues/52).
+[#52](https://github.com/cluster-guardian/cluster-guardian/issues/52).
 
-### Web dashboard and REST API
+### REST API
 
 ```sh
 cluster-guardian serve --listen 127.0.0.1:8080
 ```
 
-The dashboard supports filtering by severity and namespace, free-text search,
-collapsible sections, an auto-refresh toggle, and JSON/Markdown download
-buttons. Filtering and search also work in `-o html` file exports.
+The server exposes the analysis as JSON. It renders no HTML: the web UI is a
+separate application, [cluster-guardian-ui](https://github.com/cluster-guardian/cluster-guardian-ui),
+which consumes these endpoints. For a report you can open in a browser without
+running anything, use `analyze -o html` — a single self-contained file with
+search and filtering that works offline.
 
-Each analysis run is recorded in a history, powering a trend chart (findings
-by severity over time) and a "since previous run: N new, M resolved" diff in
-the dashboard. Pass `--history-dir /path` to persist history across restarts
-(use a PVC when running in-cluster); without it history is in-memory only.
-`--history-limit` caps the number of retained runs (default 100).
+Each analysis run is recorded in a history, which backs the trend and
+run-over-run diff endpoints. Pass `--history-dir /path` to persist history
+across restarts (use a PVC when running in-cluster); without it history is
+in-memory only. `--history-limit` caps the number of retained runs
+(default 100).
 
 | Endpoint                   | Description                                      |
 |----------------------------|--------------------------------------------------|
-| `GET /`                    | Web dashboard (HTML report)                      |
+| `GET /`                    | Index of available endpoints                     |
 | `GET /api/report`          | Report as JSON (`?refresh=true` bypasses cache)  |
 | `GET /api/report/markdown` | Report as Markdown                               |
 | `GET /api/history`         | History index: time + severity counts per run    |
 | `GET /api/history/diff`    | New and resolved findings vs the previous run    |
 | `GET /metrics`             | Prometheus metrics: findings, score, run stats   |
 | `GET /healthz`             | Liveness probe                                   |
+
+In fleet mode the per-cluster equivalents are served under
+`/api/clusters/{name}/…`.
+
+To develop against the API without a cluster, serve canned reports:
+
+```sh
+cluster-guardian serve --fixture testdata/fixtures/run1.json \
+                       --fixture testdata/fixtures/run2.json
+```
 
 ### Team ownership
 
@@ -271,7 +283,7 @@ teams:
 cluster-guardian analyze --teams-file teams.yaml --team payments-team   # one team's report
 ```
 
-Namespace sections carry a `team` field in JSON, the dashboard gains a team
+Namespace sections carry a `team` field in JSON, the API exposes a team
 filter next to the namespace dropdown, and webhook notifications route per
 team — each team only hears about new findings in its own namespaces, while
 the global `--notify-url` still receives everything. Helm: `teams` and
@@ -383,16 +395,16 @@ stringData:
 
 The local cluster is always included automatically.
 
-The root page becomes the fleet overview (grade, score, and top counts per
-cluster); each card links to that cluster's full dashboard with its own
-trends. Per-cluster API routes: `/api/clusters`,
+`GET /api/clusters` returns each cluster's grade, score, counts, last-scan time
+and any scan error; the per-cluster routes are
 `/api/clusters/{name}/report`, `/api/clusters/{name}/history` (+`/diff`).
 
 One unreachable cluster never stalls the rest: scans run concurrently with a
-per-cluster timeout, and failures surface on the cluster's card. **Security
-note:** a fleet instance holds credentials for every registered cluster —
-restrict its namespace with RBAC and NetworkPolicies, and grant target
-ServiceAccounts only view-level access.
+per-cluster timeout, and failures surface as an `error` field on that
+cluster's status rather than removing it from the list. **Security note:** a
+fleet instance holds credentials for every registered cluster — restrict its
+namespace with RBAC and NetworkPolicies, and grant target ServiceAccounts only
+view-level access.
 
 ### CI/CD integration
 
@@ -405,7 +417,7 @@ cluster-guardian analyze --fail-below 80      # exit code 2 if the health score 
 ```
 
 Every report carries a 0–100 health score and A–F grade (severity-weighted),
-shown in the terminal header, dashboard, and JSON `summary`.
+shown in the terminal header and the JSON `summary`.
 
 ## Checks
 

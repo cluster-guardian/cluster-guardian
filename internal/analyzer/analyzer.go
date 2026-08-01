@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/checks"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/kube"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/checks"
+	"github.com/cluster-guardian/cluster-guardian/internal/kube"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
 )
 
 // Options control the scope of an analysis run.

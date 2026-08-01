@@ -1,6 +1,6 @@
 BINARY  := cluster-guardian
 VERSION ?= dev
-LDFLAGS := -s -w -X github.com/AndrewKarpaty/cluster-guardian/cmd.Version=$(VERSION)
+LDFLAGS := -s -w -X github.com/cluster-guardian/cluster-guardian/cmd.Version=$(VERSION)
 
 .PHONY: build test vet lint fmt docker clean
 

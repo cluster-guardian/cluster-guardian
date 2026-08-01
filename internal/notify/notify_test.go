@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
 )
 
 func located(sev report.Severity, location, msg string) report.LocatedFinding {

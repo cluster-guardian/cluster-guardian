@@ -34,9 +34,10 @@ jobs:
         with:
           version: latest
 
-  # Boots `serve --fixture` (no cluster needed) and drives the dashboard
-  # with Playwright.
-  ui-e2e:
+  # Boots `serve --fixture` (no cluster needed) and exercises the REST API the
+  # UI repo consumes. This is the contract cluster-guardian-ui builds against,
+  # so a break here breaks a downstream repo.
+  api-contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -45,23 +46,46 @@ jobs:
           go-version-file: go.mod
       - name: Build binary
         run: go build -o cluster-guardian .
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: e2e/package-lock.json
-      - name: Install e2e dependencies
-        working-directory: e2e
-        run: npm ci
-      - name: Install Chromium
-        working-directory: e2e
-        run: npx playwright install --with-deps chromium
-      - name: Run UI e2e tests
-        working-directory: e2e
-        run: npx playwright test
-      - uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: playwright-report
-          path: e2e/playwright-report/
-          retention-days: 7
+      - name: Start fixture server
+        run: |
+          ./cluster-guardian serve \
+            --fixture testdata/fixtures/run1.json \
+            --fixture testdata/fixtures/run2.json \
+            --listen 127.0.0.1:8099 &
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8099/healthz >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          echo "fixture server did not become healthy" >&2
+          exit 1
+      - name: Check API endpoints
+        run: |
+          set -euo pipefail
+          base=http://127.0.0.1:8099
+
+          # Root advertises the API instead of serving HTML.
+          curl -fsS "$base/" | jq -e '.endpoints | length > 0' >/dev/null
+
+          # The report keeps the shape the UI depends on.
+          curl -fsS "$base/api/report" | jq -e '
+            .clusterName == "demo"
+            and (.summary.grade | type == "string")
+            and (.summary.score | type == "number")
+            and (.namespaces | length > 0)
+            and (.namespaces[0].findings[0].severity | type == "string")
+          ' >/dev/null
+
+          # History and diff back the trend views.
+          curl -fsS "$base/api/history" | jq -e '.entries | length >= 2' >/dev/null
+          curl -fsS "$base/api/history/diff" | jq -e 'has("new") and has("resolved")' >/dev/null
+
+          # Other renderers still serve.
+          curl -fsS "$base/api/report/markdown" | grep -q '^# Cluster report'
+          curl -fsS "$base/metrics" | grep -q 'cluster_guardian'
+
+          # No HTML surface remains in this repo.
+          if curl -fsS "$base/" | grep -qi '<!DOCTYPE html'; then
+            echo "server returned HTML; the UI lives in cluster-guardian-ui" >&2
+            exit 1
+          fi
+          test "$(curl -s -o /dev/null -w '%{http_code}' "$base/static/dashboard.css")" = "404"

@@ -1,9 +1,12 @@
 Cluster Guardian is deployed.
 
-Open the dashboard:
+Reach the REST API:
 
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "cluster-guardian.fullname" . }} 8080:{{ .Values.service.port }}
-  open http://127.0.0.1:8080
+  curl http://127.0.0.1:8080/api/report | jq .summary
+
+The web UI is a separate application:
+https://github.com/cluster-guardian/cluster-guardian-ui
 
 {{- if .Values.fleet.enabled }}
 

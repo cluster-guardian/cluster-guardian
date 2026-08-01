@@ -10,10 +10,10 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/deliver"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/fleet"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/history"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/deliver"
+	"github.com/cluster-guardian/cluster-guardian/internal/fleet"
+	"github.com/cluster-guardian/cluster-guardian/internal/history"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
 )
 
 // StartReportSchedule delivers a report digest on the cron schedule: the

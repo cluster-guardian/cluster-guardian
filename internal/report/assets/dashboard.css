@@ -64,10 +64,6 @@ details.card[open] > summary { margin-bottom: .5rem; }
 .chip.warning.active  { background: var(--warn-bg); color: var(--warn-fg); }
 .chip.info.active     { background: var(--info-bg); color: var(--info-fg); }
 .chip.ok.active       { background: var(--ok-bg); color: var(--ok-fg); }
-.toggle { display: flex; gap: .35rem; align-items: center; font-size: .85rem; cursor: pointer; }
-.btn { font-size: .85rem; padding: .38rem .75rem; border-radius: 9px; text-decoration: none;
-       color: inherit; border: 1px solid var(--line); }
-.btn:hover { border-color: var(--accent); color: var(--accent); }
 ul { list-style: none; }
 li { padding: .32rem 0; display: flex; gap: .6rem; align-items: baseline; }
 li + li { border-top: 1px solid var(--line); }
@@ -78,7 +74,4 @@ li + li { border-top: 1px solid var(--line); }
 .badge.warning  { background: var(--warn-bg); color: var(--warn-fg); }
 .badge.critical { background: var(--crit-bg); color: var(--crit-fg); }
 .hint { display: block; font-size: .85rem; color: var(--muted); }
-#trend { width: 100%; height: 130px; }
-.legend { display: flex; gap: 1rem; font-size: .8rem; color: var(--muted); }
-.legend i { display: inline-block; width: .8em; height: .8em; border-radius: 3px; margin-right: .3em; }
 footer { text-align: center; color: var(--muted); font-size: .8rem; margin-top: 2rem; }

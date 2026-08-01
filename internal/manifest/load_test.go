@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/AndrewKarpaty/cluster-guardian/internal/analyzer"
-	"github.com/AndrewKarpaty/cluster-guardian/internal/report"
+	"github.com/cluster-guardian/cluster-guardian/internal/analyzer"
+	"github.com/cluster-guardian/cluster-guardian/internal/report"
 )
 
 const testManifests = `apiVersion: v1

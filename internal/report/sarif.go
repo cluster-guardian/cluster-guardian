@@ -72,7 +72,7 @@ func WriteSARIF(w io.Writer, r *Report) error {
 	run := sarifRun{
 		Tool: sarifTool{Driver: sarifDriver{
 			Name:           "cluster-guardian",
-			InformationURI: "https://github.com/AndrewKarpaty/cluster-guardian",
+			InformationURI: "https://github.com/cluster-guardian/cluster-guardian",
 		}},
 		Results: []sarifResult{},
 	}
