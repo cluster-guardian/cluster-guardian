@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -11,12 +12,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/cluster-guardian/cluster-guardian/internal/analyzer"
+	"github.com/cluster-guardian/cluster-guardian/internal/auth"
 	"github.com/cluster-guardian/cluster-guardian/internal/deliver"
 	"github.com/cluster-guardian/cluster-guardian/internal/fleet"
 	"github.com/cluster-guardian/cluster-guardian/internal/history"
+	"github.com/cluster-guardian/cluster-guardian/internal/kube"
 	"github.com/cluster-guardian/cluster-guardian/internal/notify"
 	"github.com/cluster-guardian/cluster-guardian/internal/report"
 	"github.com/cluster-guardian/cluster-guardian/internal/server"
+	"github.com/cluster-guardian/cluster-guardian/internal/teams"
 )
 
 var (
@@ -39,6 +43,16 @@ var (
 	flagReportWebhook  string
 	flagReportDir      string
 	flagFixture        []string
+
+	flagAuthMode       string
+	flagAuthUserHeader string
+	flagAuthGroupsHdr  string
+	flagAuthProxies    []string
+	flagAuthGroupRoles []string
+	flagAuthDefaultRl  string
+	flagAuthAnonRole   string
+	flagAdmin          bool
+	flagTeamsConfigMap string
 )
 
 var serveCmd = &cobra.Command{
@@ -47,6 +61,7 @@ var serveCmd = &cobra.Command{
 	Long: `Starts an HTTP server exposing:
 
   GET /                    index of available endpoints
+  GET /api/me              caller's identity, role and permissions
   GET /api/report          report as JSON (append ?refresh=true to bypass cache)
   GET /api/report/markdown report as Markdown
   GET /api/history         past runs (summaries)
@@ -55,6 +70,41 @@ var serveCmd = &cobra.Command{
   GET /healthz             liveness probe
 
 With --fleet, per-cluster equivalents are served under /api/clusters.
+
+Authentication and roles
+------------------------
+By default nothing authenticates and every caller is an anonymous viewer,
+which can read but not change anything. --auth-mode=proxy takes the caller's
+identity from headers set by an authenticating proxy (oauth2-proxy, an ingress
+with OIDC, a mesh) and maps their groups to roles:
+
+  serve --auth-mode=proxy \
+        --auth-trusted-proxies=10.0.0.0/8 \
+        --auth-group-role=platform=admin \
+        --auth-group-role=sre=operator \
+        --auth-default-role=viewer
+
+Roles are ordered: viewer reads, operator also edits team ownership, admin
+also registers and removes clusters.
+
+A header is only as trustworthy as whoever can set it, so proxy mode requires
+--auth-trusted-proxies and rejects identity headers from any other peer. Put
+the server behind the proxy and keep it unreachable otherwise — a
+NetworkPolicy restricting ingress to the proxy's pods is the usual way.
+
+Write API
+---------
+--admin-api adds the endpoints the UI needs to manage a fleet:
+
+  POST   /api/clusters          register a cluster (admin)
+  DELETE /api/clusters/{name}   remove a registration (admin)
+  GET    /api/teams             team ownership (viewer)
+  PUT    /api/teams             replace team ownership (operator)
+
+Cluster registration stores credentials the caller supplies; it does not
+provision them. Provisioning needs admin rights on the target cluster, which
+the hub does not have and should not be given — "cluster add" still does that
+from an operator's own kubeconfig. Team editing needs --teams-configmap.
 
 The web UI is a separate application (cluster-guardian-ui) that consumes this
 API; this server renders no HTML. For a report you can open in a browser
@@ -76,6 +126,12 @@ without a server, use "analyze -o html".`,
 			return err
 		}
 		srv := server.New(client, opts, flagCacheTTL, hist)
+
+		authCfg, err := authConfig()
+		if err != nil {
+			return err
+		}
+		srv.EnableAuth(authCfg)
 
 		notifier, err := buildNotifier()
 		if err != nil {
@@ -99,18 +155,25 @@ without a server, use "analyze -o html".`,
 				return err
 			}
 		}
+		var mgr *fleet.Manager
 		if flagFleet {
 			reg := &fleet.Registry{
 				Local:     client,
 				Clientset: client.Clientset,
 				Namespace: fleetNamespace(),
 			}
-			mgr := fleet.NewManager(reg, opts, flagFleetInterval, flagHistoryDir, flagHistoryLimit)
+			mgr = fleet.NewManager(reg, opts, flagFleetInterval, flagHistoryDir, flagHistoryLimit)
 			if notifier != nil {
 				mgr.EnableNotifications(notifier)
 			}
 			srv.EnableFleet(mgr)
 			go mgr.Run(context.Background())
+		}
+
+		if flagAdmin {
+			if err := enableAdmin(srv, client, mgr, authCfg); err != nil {
+				return err
+			}
 		}
 		return srv.ListenAndServe(flagListen)
 	},
@@ -135,7 +198,90 @@ func init() {
 	serveCmd.Flags().StringVar(&flagReportWebhook, "report-webhook-url", "", "webhook POSTed the report JSON on schedule")
 	serveCmd.Flags().StringVar(&flagReportDir, "report-dir", "", "directory to write scheduled report files into")
 	serveCmd.Flags().StringSliceVar(&flagFixture, "fixture", nil, "serve canned report JSON files instead of analyzing a cluster (repeatable; for demos and UI tests)")
+
+	serveCmd.Flags().StringVar(&flagAuthMode, "auth-mode", "none", `how to identify callers: "none" (everyone anonymous) or "proxy" (identity from headers set by an authenticating proxy)`)
+	serveCmd.Flags().StringVar(&flagAuthUserHeader, "auth-user-header", auth.DefaultUserHeader, "header carrying the authenticated username")
+	serveCmd.Flags().StringVar(&flagAuthGroupsHdr, "auth-groups-header", auth.DefaultGroupsHeader, "header carrying the caller's groups, comma-separated")
+	serveCmd.Flags().StringSliceVar(&flagAuthProxies, "auth-trusted-proxies", nil, `CIDRs or IPs whose identity headers are believed; "any" trusts every peer (required with --auth-mode=proxy)`)
+	serveCmd.Flags().StringSliceVar(&flagAuthGroupRoles, "auth-group-role", nil, "map a group to a role, e.g. platform=admin (repeatable)")
+	serveCmd.Flags().StringVar(&flagAuthDefaultRl, "auth-default-role", "viewer", "role for an authenticated caller whose groups match no mapping: none, viewer, operator, admin")
+	serveCmd.Flags().StringVar(&flagAuthAnonRole, "auth-anonymous-role", "viewer", "role for a caller with no identity: none, viewer, operator, admin")
+	serveCmd.Flags().BoolVar(&flagAdmin, "admin-api", false, "serve the write API (cluster registration, team ownership); requires a cluster connection")
+	serveCmd.Flags().StringVar(&flagTeamsConfigMap, "teams-configmap", "", "ConfigMap holding the team mapping, made editable via PUT /api/teams (default: disabled)")
+
 	rootCmd.AddCommand(serveCmd)
+}
+
+// authConfig builds the identity configuration from the flags, refusing the
+// combinations that would quietly leave the API open.
+func authConfig() (auth.Config, error) {
+	anon, err := auth.ParseRole(flagAuthAnonRole)
+	if err != nil {
+		return auth.Config{}, fmt.Errorf("--auth-anonymous-role: %w", err)
+	}
+	def, err := auth.ParseRole(flagAuthDefaultRl)
+	if err != nil {
+		return auth.Config{}, fmt.Errorf("--auth-default-role: %w", err)
+	}
+	cfg := auth.Config{
+		UserHeader:    flagAuthUserHeader,
+		GroupsHeader:  flagAuthGroupsHdr,
+		GroupRoles:    map[string]auth.Role{},
+		DefaultRole:   def,
+		AnonymousRole: anon,
+	}
+
+	switch strings.ToLower(flagAuthMode) {
+	case "", "none":
+		// Nothing authenticates the caller, so nothing may be trusted to name
+		// them. Refuse to hand out write permissions to everyone by accident.
+		if anon > auth.RoleViewer {
+			return auth.Config{}, fmt.Errorf(
+				"--auth-anonymous-role=%s requires --auth-mode=proxy: with no authentication every caller would hold that role", anon)
+		}
+	case "proxy":
+		cfg.Enabled = true
+		if len(flagAuthProxies) == 0 {
+			return auth.Config{}, fmt.Errorf(
+				"--auth-mode=proxy requires --auth-trusted-proxies: identity headers are only meaningful from a peer that cannot be bypassed")
+		}
+		nets, err := auth.ParseTrustedProxies(flagAuthProxies)
+		if err != nil {
+			return auth.Config{}, fmt.Errorf("--auth-trusted-proxies: %w", err)
+		}
+		cfg.TrustedProxies = nets
+	default:
+		return auth.Config{}, fmt.Errorf(`--auth-mode: unknown mode %q (want "none" or "proxy")`, flagAuthMode)
+	}
+
+	for _, pair := range flagAuthGroupRoles {
+		group, roleName, ok := strings.Cut(pair, "=")
+		if !ok {
+			return auth.Config{}, fmt.Errorf("--auth-group-role %q: expected group=role", pair)
+		}
+		role, err := auth.ParseRole(roleName)
+		if err != nil {
+			return auth.Config{}, fmt.Errorf("--auth-group-role %q: %w", pair, err)
+		}
+		cfg.GroupRoles[strings.TrimSpace(group)] = role
+	}
+	return cfg, nil
+}
+
+// enableAdmin turns on the write API. It refuses to do so when nothing
+// authenticates the caller and anonymous callers could reach it — registering
+// a cluster stores credentials, and that is not an anonymous operation.
+func enableAdmin(srv *server.Server, client *kube.Client, mgr *fleet.Manager, authCfg auth.Config) error {
+	if !authCfg.Enabled && authCfg.AnonymousRole >= auth.RoleOperator {
+		return fmt.Errorf("--admin-api needs --auth-mode=proxy: without it every caller would hold role %s", authCfg.AnonymousRole)
+	}
+	ns := fleetNamespace()
+	adm := &server.Admin{Clientset: client.Clientset, Namespace: ns, Fleet: mgr}
+	if flagTeamsConfigMap != "" {
+		adm.Teams = &teams.Store{Clientset: client.Clientset, Namespace: ns, Name: flagTeamsConfigMap}
+	}
+	srv.EnableAdmin(adm)
+	return nil
 }
 
 // serveFixture serves canned report JSON files instead of analyzing a
@@ -162,6 +308,20 @@ func serveFixture() error {
 	}
 	srv := server.New(nil, analyzer.Options{}, flagCacheTTL, hist)
 	srv.SetFixture(last)
+
+	authCfg, err := authConfig()
+	if err != nil {
+		return err
+	}
+	srv.EnableAuth(authCfg)
+
+	// The write API needs a cluster to write to, so fixture mode serves reads
+	// only. Auth still applies, which is the point: --auth-mode=proxy with
+	// --auth-trusted-proxies=any lets the UI exercise every role by setting
+	// request headers, with no cluster and no identity provider.
+	if flagAdmin {
+		log.Printf("--admin-api ignored in fixture mode: the write API needs a cluster to write to")
+	}
 	return srv.ListenAndServe(flagListen)
 }
 

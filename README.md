@@ -244,18 +244,25 @@ across restarts (use a PVC when running in-cluster); without it history is
 in-memory only. `--history-limit` caps the number of retained runs
 (default 100).
 
-| Endpoint                   | Description                                      |
-|----------------------------|--------------------------------------------------|
-| `GET /`                    | Index of available endpoints                     |
-| `GET /api/report`          | Report as JSON (`?refresh=true` bypasses cache)  |
-| `GET /api/report/markdown` | Report as Markdown                               |
-| `GET /api/history`         | History index: time + severity counts per run    |
-| `GET /api/history/diff`    | New and resolved findings vs the previous run    |
-| `GET /metrics`             | Prometheus metrics: findings, score, run stats   |
-| `GET /healthz`             | Liveness probe                                   |
+| Endpoint                   | Role     | Description                                      |
+|----------------------------|----------|--------------------------------------------------|
+| `GET /`                    | —        | Index of available endpoints                     |
+| `GET /api/me`              | —        | Caller's identity, role and permissions          |
+| `GET /api/report`          | viewer   | Report as JSON (`?refresh=true` bypasses cache)  |
+| `GET /api/report/markdown` | viewer   | Report as Markdown                               |
+| `GET /api/history`         | viewer   | History index: time + severity counts per run    |
+| `GET /api/history/diff`    | viewer   | New and resolved findings vs the previous run    |
+| `POST /api/clusters`       | admin    | Register a cluster (needs `--admin-api`)         |
+| `DELETE /api/clusters/{name}` | admin | Remove a registration                            |
+| `GET /api/teams`           | viewer   | Team ownership mapping                           |
+| `PUT /api/teams`           | operator | Replace the team ownership mapping               |
+| `GET /metrics`             | —        | Prometheus metrics: findings, score, run stats   |
+| `GET /healthz`             | —        | Liveness probe                                   |
 
 In fleet mode the per-cluster equivalents are served under
-`/api/clusters/{name}/…`.
+`/api/clusters/{name}/…`. `/`, `/healthz` and `/metrics` skip authorization: a
+kubelet probe and a Prometheus scrape carry no identity, and none of them
+exposes findings.
 
 To develop against the API without a cluster, serve canned reports:
 
@@ -263,6 +270,87 @@ To develop against the API without a cluster, serve canned reports:
 cluster-guardian serve --fixture testdata/fixtures/run1.json \
                        --fixture testdata/fixtures/run2.json
 ```
+
+### Authentication and roles
+
+By default nothing authenticates and every caller is an anonymous **viewer**:
+reads are open, nothing can be changed. That is the behaviour this server has
+always had.
+
+`--auth-mode=proxy` takes the caller's identity from headers set by an
+authenticating proxy — oauth2-proxy, an ingress with OIDC, a service mesh — and
+maps their groups to roles. cluster-guardian does not speak OIDC itself: it is
+a read-only analysis tool, and owning a session store, a redirect flow and
+token refresh adds a large security surface for nothing the surrounding
+infrastructure does not already provide.
+
+```sh
+cluster-guardian serve \
+  --auth-mode=proxy \
+  --auth-trusted-proxies=10.0.0.0/8 \
+  --auth-group-role=platform=admin \
+  --auth-group-role=sre=operator \
+  --auth-default-role=viewer
+```
+
+| Role       | Can                                                        |
+|------------|------------------------------------------------------------|
+| `none`     | nothing — for denying by default with `--auth-default-role` |
+| `viewer`   | read reports, history and team ownership                   |
+| `operator` | + edit team ownership                                      |
+| `admin`    | + register and remove clusters                             |
+
+A user in several mapped groups gets the highest role. One whose groups match
+nothing gets `--auth-default-role` (viewer by default; set `none` to deny).
+
+**A header is only as trustworthy as whoever can set it.** Proxy mode therefore
+requires `--auth-trusted-proxies` and *rejects* identity headers arriving from
+any other peer, rather than quietly ignoring them — headers from an unexpected
+source mean either a misconfiguration or an attempt to bypass the proxy, and
+both should be loud. Keep the server unreachable except through the proxy; a
+NetworkPolicy restricting ingress to the proxy's pods is the usual way.
+`--auth-trusted-proxies=any` disables the check for meshes where the peer
+address is not predictable — a foot-gun everywhere else.
+
+Two combinations are refused at startup rather than silently accepted:
+`--auth-anonymous-role` above `viewer` without proxy mode, and `--admin-api`
+with an anonymous role of operator or above. Both would hand write access to
+every caller.
+
+### Managing clusters and teams over the API
+
+`--admin-api` adds the write endpoints the web UI needs. It requires a cluster
+connection, so it is unavailable in `--fixture` mode.
+
+```sh
+cluster-guardian serve --fleet --admin-api \
+  --teams-configmap cluster-guardian-teams \
+  --auth-mode=proxy --auth-trusted-proxies=10.0.0.0/8 \
+  --auth-group-role=platform=admin
+```
+
+Registering a cluster writes the same labeled Secret `cluster add` writes, so a
+cluster added through the API and one added from the CLI are indistinguishable
+afterwards:
+
+```sh
+curl -X POST http://localhost:8080/api/clusters -d '{
+  "name": "prod",
+  "server": "https://prod.example.com:6443",
+  "bearerToken": "<token>",
+  "caData": "<base64 CA>"
+}'
+```
+
+It stores credentials the caller supplies rather than provisioning them:
+provisioning needs admin rights on the *target* cluster, which the hub does not
+have and should not be given. `cluster add` still does that from an operator's
+own kubeconfig, and remains the recommended path.
+
+`PUT /api/teams` rewrites the ConfigMap named by `--teams-configmap` — the same
+one the Helm chart renders from its `teams` value. Webhook URLs are redacted to
+`***` on read, and a `***` sent back on write keeps the stored value, so
+editing ownership through a UI never wipes a webhook it was not shown.
 
 ### Team ownership
 
